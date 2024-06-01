@@ -1,0 +1,43 @@
+name: Build and Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        required: true
+        default: 'main'
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout the Private Repository
+        uses: actions/checkout@v2
+        with:
+          repository: Hantex9/easybook-release-automation-api
+          token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
+          ref: ${{ github.event.inputs.branch }}
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: npm
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Configure Apple credentials
+        run: |
+          eas credentials -p ios --apple-id ${{ secrets.APPLE_ID }} --app-specific-password ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+
+      - name: Build iOS
+        run: eas build --platform ios --local --non-interactive
