@@ -35,9 +35,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Configure Apple credentials
-        run: |
-          eas credentials -p ios --apple-id ${{ secrets.APPLE_ID }} --app-specific-password ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-
       - name: Build iOS
+        env:
+          EAS_NO_VCS: 1
+          EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          EXPO_APPLE_ID: ${{ secrets.APPLE_ID }}
+          EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: eas build --platform ios --local --non-interactive
