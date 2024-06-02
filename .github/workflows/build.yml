@@ -80,12 +80,14 @@ jobs:
 
       - name: Set Fastlane environment variables
         run: |
-          echo "export FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD=${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}" >> $GITHUB_ENV
-          echo "export SPACESHIP_CONNECT_API_KEY_PATH=fastlane/api_key.json" >> $GITHUB_ENV
+          echo "SPACESHIP_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> $GITHUB_ENV
+          echo "FASTLANE_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> $GITHUB_ENV
 
       - name: Create App ID if not exists
+        env:
+          SPACESHIP_CONNECT_API_KEY_PATH: $(pwd)/fastlane/api_key.json
         run: |
-          fastlane produce -u ${{ secrets.APPLE_ID }} -a $BUNDLE_ID --skip_itc --api_key_path fastlane/api_key.json
+          fastlane produce -u ${{ secrets.APPLE_ID }} -a $BUNDLE_ID --skip_itc
 
       - name: Create provisioning profiles
         run: |
