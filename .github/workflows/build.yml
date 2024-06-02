@@ -42,15 +42,54 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Decode and Create Certificate
+      - name: Install jq
+        run: brew install jq
+
+      - name: Install fastlane
+        run: brew install fastlane
+
+      - name: Extract and transform app name from app.json
+        id: extract-transform-name
         run: |
-          echo "${{ secrets.APPLE_P8 }}" | base64 --decode > AuthKey.p8
+          NAME=$(jq -r '.expo.name' app.json)
+          BUNDLE_ID=$(echo $NAME | tr -d ' ')
+          echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
+
+      - name: Decode and Create Certificate and Provisioning Profile
+        run: |
+          echo "${{ secrets.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
+
+      - name: Create provisioning profiles
+        run: |
+          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}" > AuthKey.p8
+          fastlane sigh --app_identifier $BUNDLE_ID --output_path . --filename provisioning_profile.mobileprovision --api_key_key_id ${{ secrets.APPLE_KEY_ID }} --api_key_issuer_id ${{ secrets.APPLE_ISSUER_ID }} --api_key_path AuthKey.p8
+          fastlane sigh --app_identifier "${BUNDLE_ID}.OneSignalNotificationServiceExtension" --output_path . --filename provisioning_profile_onesignal.mobileprovision --api_key_key_id ${{ secrets.APPLE_KEY_ID }} --api_key_issuer_id ${{ secrets.APPLE_ISSUER_ID }} --api_key_path AuthKey.p8
+
+      - name: Create credentials.json
+        run: |
+          echo '{
+            "ios": {
+              "OneSignalNotificationServiceExtension": {
+                "distributionCertificate": {
+                  "path": "certificate.p12",
+                  "password": "${{ secrets.CERT_P12_PASSWORD }}"
+                },
+                "provisioningProfilePath": "provisioning_profile_onesignal.mobileprovision"
+              },
+              "'$BUNDLE_ID'": {
+                "distributionCertificate": {
+                  "path": "certificate.p12",
+                  "password": "${{ secrets.CERT_P12_PASSWORD }}"
+                },
+                "provisioningProfilePath": "provisioning_profile.mobileprovision"
+              }
+            }
+          }' > ./credentials.json
 
       - name: Build iOS
         env:
           EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           EXPO_APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           EXPO_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
-          EXPO_APPLE_API_KEY_PATH: AuthKey.p8
-        run: |
-          eas build -p ios --local --non-interactive --profile production
+          EXPO_APPLE_API_KEY_PATH: ${{ secrets.APPLE_P8 }}
+        run: eas build -p ios --local --non-interactive
