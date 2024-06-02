@@ -86,7 +86,7 @@ jobs:
             api_key = app_store_connect_api_key(
               key_id: '${{ secrets.APPLE_KEY_ID }}',
               issuer_id: '${{ secrets.APPLE_ISSUER_ID }}',
-              key_filepath: 'AuthKey.p8'
+              key_filepath: '$(pwd)/fastlane/AuthKey.p8'
             )
 
             # Function to check if an app exists
@@ -100,7 +100,7 @@ jobs:
             Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
               key_id: '${{ secrets.APPLE_KEY_ID }}',
               issuer_id: '${{ secrets.APPLE_ISSUER_ID }}',
-              key: File.read('AuthKey.p8')
+              filepath: '$(pwd)/fastlane/AuthKey.p8'
             )
 
             # Check if the main app exists
