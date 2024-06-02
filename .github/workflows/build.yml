@@ -84,4 +84,5 @@ jobs:
           EXPO_APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           EXPO_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
           EXPO_APPLE_P8: ${{ secrets.APPLE_P8 }}
+          EXPO_NO_DOTENV: 1
         run: eas build -p ios --local --non-interactive
