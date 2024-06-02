@@ -124,4 +124,4 @@ jobs:
           AUTH_KEY_PATH: "fastlane/AuthKey.p8"
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
-        run: fastlane upload_to_app_store
+        run: fastlane upload_ipa_to_app_store
