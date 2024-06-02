@@ -83,11 +83,12 @@ jobs:
       - name: Create Fastfile
         run: |
           AUTH_KEY_PATH="$(pwd)/fastlane/AuthKey.p8"
-          echo 'lane :create_app do
+          cat <<EOL > fastlane/Fastfile
+          lane :create_app do
             api_key = app_store_connect_api_key(
               key_id: "${{ secrets.APPLE_KEY_ID }}",
               issuer_id: "${{ secrets.APPLE_ISSUER_ID }}",
-              key_filepath: "'$AUTH_KEY_PATH'"
+              key_filepath: "${AUTH_KEY_PATH}"
             )
 
             # Function to check if an app exists
@@ -102,17 +103,17 @@ jobs:
             end
 
             # Authenticate with API key
-            begin
-              token = Spaceship::ConnectAPI::Token.create(
-                key_id: "${{ secrets.APPLE_KEY_ID }}",
-                issuer_id: "${{ secrets.APPLE_ISSUER_ID }}",
-                filepath: "'$AUTH_KEY_PATH'"
-              )
-              Spaceship::ConnectAPI.token = token
+            token = Spaceship::ConnectAPI::Token.create(
+              key_id: "${{ secrets.APPLE_KEY_ID }}",
+              issuer_id: "${{ secrets.APPLE_ISSUER_ID }}",
+              filepath: "${AUTH_KEY_PATH}"
+            )
+            Spaceship::ConnectAPI.token = token
 
-              # Create the app if it does not exist
-              unless app_exists?(ENV["BUNDLE_ID"])
-                UI.message("Main app does not exist. Creating...")
+            # Create the app if it doesn't exist
+            unless app_exists?(ENV["BUNDLE_ID"])
+              UI.message("Main app does not exist. Creating...")
+              begin
                 app = Spaceship::ConnectAPI::App.create(
                   name: ENV["BUNDLE_TARGET"],
                   primary_locale: "en-US",
@@ -125,13 +126,18 @@ jobs:
                 else
                   UI.message("Created app: #{app.name}")
                 end
-              else
-                UI.message("Main app already exists. Skipping creation.")
+              rescue => e
+                UI.error("Error creating main app: #{e.message}")
+                raise e
               end
+            else
+              UI.message("Main app already exists. Skipping creation.")
+            end
 
-              # Create the OneSignal Notification Service Extension app if it does not exist
-              unless app_exists?(ENV["EXTENSION_BUNDLE_ID"])
-                UI.message("OneSignal Notification Service Extension app does not exist. Creating...")
+            # Create the OneSignal Notification Service Extension app if it doesn't exist
+            unless app_exists?(ENV["EXTENSION_BUNDLE_ID"])
+              UI.message("OneSignal Notification Service Extension app does not exist. Creating...")
+              begin
                 app_extension = Spaceship::ConnectAPI::App.create(
                   name: ENV["BUNDLE_TARGET"] + " OneSignal Extension",
                   primary_locale: "en-US",
@@ -144,28 +150,28 @@ jobs:
                 else
                   UI.message("Created app extension: #{app_extension.name}")
                 end
-              else
-                UI.message("OneSignal Notification Service Extension app already exists. Skipping creation.")
+              rescue => e
+                UI.error("Error creating OneSignal Notification Service Extension app: #{e.message}")
+                raise e
               end
-
-              # Generate provisioning profiles
-              sigh(
-                app_identifier: ENV["BUNDLE_ID"],
-                output_path: ".",
-                filename: "provisioning_profile.mobileprovision"
-              )
-              sigh(
-                app_identifier: ENV["EXTENSION_BUNDLE_ID"],
-                output_path: ".",
-                filename: "provisioning_profile_onesignal.mobileprovision"
-              )
-            rescue => e
-              UI.error("An error occurred: #{e.message}")
-              UI.error(e.backtrace.join("\n"))
-              raise e
+            else
+              UI.message("OneSignal Notification Service Extension app already exists. Skipping creation.")
             end
-          end' > fastlane/Fastfile
-    
+
+            # Generate provisioning profiles
+            sigh(
+              app_identifier: ENV["BUNDLE_ID"],
+              output_path: ".",
+              filename: "provisioning_profile.mobileprovision"
+            )
+            sigh(
+              app_identifier: ENV["EXTENSION_BUNDLE_ID"],
+              output_path: ".",
+              filename: "provisioning_profile_onesignal.mobileprovision"
+            )
+          end
+          EOL
+          
       - name: Run Fastlane
         run: fastlane create_app
 
