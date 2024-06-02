@@ -44,12 +44,21 @@ jobs:
 
       - name: Decode and Create Certificate
         run: |
-          echo "${{ secrets.APPLE_P8 }}" | base64 --decode > certificate.p8
+          echo "${{ secrets.APPLE_P8 }}" | base64 --decode > AuthKey.p8
+
+      - name: Configure EAS Credentials
+        env:
+          EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          EXPO_APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          EXPO_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+          EXPO_APPLE_KEY_PATH: AuthKey.p8
+        run: |
+          eas credentials --platform ios --non-interactive
 
       - name: Build iOS
         env:
           EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           EXPO_APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           EXPO_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
-          EXPO_APPLE_KEY_PATH: certificate.p8
+          EXPO_APPLE_KEY_PATH: AuthKey.p8
         run: eas build -p ios --local --non-interactive
