@@ -53,7 +53,7 @@ jobs:
           EXPO_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
           EXPO_APPLE_KEY_PATH: AuthKey.p8
         run: |
-          eas build:configure --platform ios --non-interactive
+          eas build:configure --platform ios
 
       - name: Build iOS
         env:
