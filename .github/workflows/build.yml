@@ -91,17 +91,6 @@ jobs:
               key_filepath: "${AUTH_KEY_PATH}"
             )
 
-            # Function to check if an app exists
-            def app_exists?(bundle_id)
-              begin
-                app = Spaceship::ConnectAPI::App.find(bundle_id)
-                return !app.nil?
-              rescue Spaceship::TunesClient::ITunesConnectError => e
-                UI.error("Error checking if app exists: #{e.message}")
-                return false
-              end
-            end
-
             # Authenticate with API key
             token = Spaceship::ConnectAPI::Token.create(
               key_id: "${{ secrets.APPLE_KEY_ID }}",
@@ -109,54 +98,6 @@ jobs:
               filepath: "${AUTH_KEY_PATH}"
             )
             Spaceship::ConnectAPI.token = token
-
-            # Create the app if it doesn't exist
-            unless app_exists?(ENV["BUNDLE_ID"])
-              UI.message("Main app does not exist. Creating...")
-              begin
-                app = Spaceship::ConnectAPI::App.create(
-                  name: ENV["BUNDLE_TARGET"],
-                  primary_locale: "en-US",
-                  sku: ENV["BUNDLE_ID"].gsub(".", "-"),
-                  bundle_id: ENV["BUNDLE_ID"]
-                )
-                if app.nil?
-                  UI.error("Failed to create main app. App object is nil.")
-                  return
-                else
-                  UI.message("Created app: #{app.name}")
-                end
-              rescue => e
-                UI.error("Error creating main app: #{e.message}")
-                raise e
-              end
-            else
-              UI.message("Main app already exists. Skipping creation.")
-            end
-
-            # Create the OneSignal Notification Service Extension app if it doesn't exist
-            unless app_exists?(ENV["EXTENSION_BUNDLE_ID"])
-              UI.message("OneSignal Notification Service Extension app does not exist. Creating...")
-              begin
-                app_extension = Spaceship::ConnectAPI::App.create(
-                  name: ENV["BUNDLE_TARGET"] + " OneSignal Extension",
-                  primary_locale: "en-US",
-                  sku: ENV["EXTENSION_BUNDLE_ID"].gsub(".", "-"),
-                  bundle_id: ENV["EXTENSION_BUNDLE_ID"]
-                )
-                if app_extension.nil?
-                  UI.error("Failed to create OneSignal Notification Service Extension app. App object is nil.")
-                  return
-                else
-                  UI.message("Created app extension: #{app_extension.name}")
-                end
-              rescue => e
-                UI.error("Error creating OneSignal Notification Service Extension app: #{e.message}")
-                raise e
-              end
-            else
-              UI.message("OneSignal Notification Service Extension app already exists. Skipping creation.")
-            end
 
             # Generate provisioning profiles
             sigh(
