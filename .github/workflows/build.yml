@@ -79,7 +79,7 @@ jobs:
           echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
           jq -n --arg key_id "${{ secrets.APPLE_KEY_ID }}" --arg issuer_id "${{ secrets.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
           '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
-
+      
       - name: Create Fastfile
         run: |
           AUTH_KEY_PATH="$(pwd)/fastlane/AuthKey.p8"
@@ -93,7 +93,8 @@ jobs:
             # Function to check if an app exists
             def app_exists?(bundle_id)
               Spaceship::ConnectAPI::App.find(bundle_id) != nil
-            rescue Spaceship::TunesClient::ITunesConnectError
+            rescue Spaceship::TunesClient::ITunesConnectError => e
+              UI.error("Error checking if app exists: #{e.message}")
               return false
             end
 
@@ -115,7 +116,12 @@ jobs:
                   sku: ENV["BUNDLE_ID"].gsub(".", "-"),
                   bundle_id: ENV["BUNDLE_ID"]
                 )
-                UI.message("Created app: #{app.name}")
+                if app.nil?
+                  UI.error("Failed to create main app. App object is nil.")
+                  return
+                else
+                  UI.message("Created app: #{app.name}")
+                end
               else
                 UI.message("Main app already exists. Skipping creation.")
               end
@@ -129,7 +135,12 @@ jobs:
                   sku: ENV["EXTENSION_BUNDLE_ID"].gsub(".", "-"),
                   bundle_id: ENV["EXTENSION_BUNDLE_ID"]
                 )
-                UI.message("Created app extension: #{app_extension.name}")
+                if app_extension.nil?
+                  UI.error("Failed to create OneSignal Notification Service Extension app. App object is nil.")
+                  return
+                else
+                  UI.message("Created app extension: #{app_extension.name}")
+                end
               else
                 UI.message("OneSignal Notification Service Extension app already exists. Skipping creation.")
               end
