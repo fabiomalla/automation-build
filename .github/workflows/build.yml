@@ -48,7 +48,7 @@ jobs:
       - name: Extract and transform app name from app.json
         id: extract-transform-name
         run: |
-          NAME=$(jq -r '.expo.ios.bundleIdentifier' app.json)
+          NAME=$(jq -r '.expo.name' app.json)
           BUNDLE_ID=$(echo $NAME | tr -d ' ')
           echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
 
@@ -56,6 +56,7 @@ jobs:
         run: |
           echo "${{ secrets.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
           echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > provisioning_profile.mobileprovision
+          echo "${{ secrets.PROVISIONING_PROFILE_ONESIGNAL_BASE64 }}" | base64 --decode > provisioning_profile_onesignal.mobileprovision
 
       - name: Create credentials.json
         run: |
@@ -66,7 +67,7 @@ jobs:
                   "path": "certificate.p12",
                   "password": "${{ secrets.CERT_P12_PASSWORD }}"
                 },
-                "provisioningProfilePath": "provisioning_profile.mobileprovision"
+                "provisioningProfilePath": "provisioning_profile_onesignal.mobileprovision"
               },
               "'$BUNDLE_ID'": {
                 "distributionCertificate": {
