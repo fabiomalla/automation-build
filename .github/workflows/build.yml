@@ -38,10 +38,11 @@ jobs:
       - name: Install jq
         run: brew install jq
 
-      - name: Extract bundleId from app.json
-        id: extract-bundle-id
+      - name: Extract and transform app name from app.json
+        id: extract-transform-name
         run: |
-          BUNDLE_ID=$(jq -r '.expo.ios.bundleIdentifier' app.json)
+          NAME=$(jq -r '.expo.name' app.json)
+          BUNDLE_ID=$(echo $NAME | tr -d ' ')
           echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
 
       - name: Decode and Create Certificate and Provisioning Profile
@@ -53,6 +54,13 @@ jobs:
         run: |
           echo '{
             "ios": {
+              "OneSignalNotificationServiceExtension": {
+                "distributionCertificate": {
+                  "path": "certificate.p12",
+                  "password": "${{ secrets.CERT_P12_PASSWORD }}"
+                },
+                "provisioningProfilePath": "provisioning_profile.mobileprovision"
+              },
               "'$BUNDLE_ID'": {
                 "distributionCertificate": {
                   "path": "certificate.p12",
