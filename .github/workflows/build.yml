@@ -40,4 +40,7 @@ jobs:
           EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           EXPO_APPLE_ID: ${{ secrets.APPLE_ID }}
           EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          EXPO_APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          EXPO_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+          EXPO_APPLE_P8: ${{ secrets.APPLE_P8 }}
         run: eas build -p ios --local --non-interactive
