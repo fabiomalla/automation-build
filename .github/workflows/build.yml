@@ -72,6 +72,8 @@ jobs:
       - name: Decode and Create Certificate and Provisioning Profile
         run: |
           echo "${{ secrets.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
+          security import certificate.p12 -P "${{ secrets.CERT_P12_PASSWORD }}" -A
+          security find-identity -v -p codesigning
           
       - name: Configure Fastlane API Key
         run: |
