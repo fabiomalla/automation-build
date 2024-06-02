@@ -48,7 +48,7 @@ jobs:
       - name: Extract and transform app name from app.json
         id: extract-transform-name
         run: |
-          NAME=$(jq -r '.expo.name' app.json)
+          NAME=$(jq -r '.expo.ios.bundleIdentifier' app.json)
           BUNDLE_ID=$(echo $NAME | tr -d ' ')
           echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
 
