@@ -42,48 +42,15 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Install jq
-        run: brew install jq
-
-      - name: Extract and transform app name from app.json
-        id: extract-transform-name
+      - name: Decode and Create Certificate
         run: |
-          NAME=$(jq -r '.expo.name' app.json)
-          BUNDLE_ID=$(echo $NAME | tr -d ' ')
-          echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
-
-      - name: Decode and Create Certificate and Provisioning Profile
-        run: |
-          echo "${{ secrets.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
-          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > provisioning_profile.mobileprovision
-          echo "${{ secrets.PROVISIONING_PROFILE_ONESIGNAL_BASE64 }}" | base64 --decode > provisioning_profile_onesignal.mobileprovision
-
-      - name: Create credentials.json
-        run: |
-          echo '{
-            "ios": {
-              "OneSignalNotificationServiceExtension": {
-                "distributionCertificate": {
-                  "path": "certificate.p12",
-                  "password": "${{ secrets.CERT_P12_PASSWORD }}"
-                },
-                "provisioningProfilePath": "provisioning_profile_onesignal.mobileprovision"
-              },
-              "'$BUNDLE_ID'": {
-                "distributionCertificate": {
-                  "path": "certificate.p12",
-                  "password": "${{ secrets.CERT_P12_PASSWORD }}"
-                },
-                "provisioningProfilePath": "provisioning_profile.mobileprovision"
-              }
-            }
-          }' > ./credentials.json
+          echo "${{ secrets.APPLE_P8 }}" | base64 --decode > AuthKey.p8
 
       - name: Build iOS
         env:
           EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           EXPO_APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           EXPO_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
-          EXPO_APPLE_P8: ${{ secrets.APPLE_P8 }}
-          EXPO_NO_DOTENV: 1
-        run: eas build -p ios --local --non-interactive
+          EXPO_APPLE_API_KEY_PATH: AuthKey.p8
+        run: |
+          eas build -p ios --local --non-interactive
