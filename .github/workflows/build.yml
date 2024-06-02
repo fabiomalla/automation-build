@@ -82,40 +82,13 @@ jobs:
           jq -n --arg key_id "${{ secrets.APPLE_KEY_ID }}" --arg issuer_id "${{ secrets.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
           '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
 
-      - name: Create Fastfile
-        run: |
-          AUTH_KEY_PATH="$(pwd)/fastlane/AuthKey.p8"
-          cat <<EOL > fastlane/Fastfile
-          lane :create_app do
-            api_key = app_store_connect_api_key(
-              key_id: "${{ secrets.APPLE_KEY_ID }}",
-              issuer_id: "${{ secrets.APPLE_ISSUER_ID }}",
-              key_filepath: "${AUTH_KEY_PATH}"
-            )
-
-            # Authenticate with API key
-            token = Spaceship::ConnectAPI::Token.create(
-              key_id: "${{ secrets.APPLE_KEY_ID }}",
-              issuer_id: "${{ secrets.APPLE_ISSUER_ID }}",
-              filepath: "${AUTH_KEY_PATH}"
-            )
-            Spaceship::ConnectAPI.token = token
-
-            # Generate provisioning profiles
-            sigh(
-              app_identifier: ENV["BUNDLE_ID"],
-              output_path: ".",
-              filename: "provisioning_profile.mobileprovision"
-            )
-            sigh(
-              app_identifier: ENV["EXTENSION_BUNDLE_ID"],
-              output_path: ".",
-              filename: "provisioning_profile_onesignal.mobileprovision"
-            )
-          end
-          EOL
-          
-      - name: Run Fastlane
+      - name: Run Fastlane Create App
+        env:
+          AUTH_KEY_PATH: "$(pwd)/fastlane/AuthKey.p8"
+          APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+          BUNDLE_ID: ${{ steps.extract-transform-name.outputs.BUNDLE_ID }}
+          EXTENSION_BUNDLE_ID: ${{ steps.extract-transform-name.outputs.EXTENSION_BUNDLE_ID }}
         run: fastlane create_app
 
       - name: Create credentials.json
@@ -146,3 +119,10 @@ jobs:
           EXPO_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
           EXPO_APPLE_API_KEY_PATH: ${{ secrets.APPLE_P8 }}
         run: eas build -p ios --local --non-interactive
+
+      - name: Upload to App Store
+        env:
+          AUTH_KEY_PATH: "$(pwd)/fastlane/AuthKey.p8"
+          APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+        run: fastlane upload_to_app_store
