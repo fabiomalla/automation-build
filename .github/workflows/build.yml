@@ -72,11 +72,11 @@ jobs:
       - name: Configure Fastlane API Key
         run: |
           mkdir -p fastlane
-          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}" > fastlane/AuthKey.p8
+          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}" | base64 --decode > fastlane/AuthKey.p8
           echo "{
             \"key_id\": \"${{ secrets.APPLE_KEY_ID }}\",
             \"issuer_id\": \"${{ secrets.APPLE_ISSUER_ID }}\",
-            \"key_path\": \"fastlane/AuthKey.p8\"
+            \"key\": \"$(cat fastlane/AuthKey.p8)\"
           }" > fastlane/api_key.json
 
       - name: Create provisioning profiles
