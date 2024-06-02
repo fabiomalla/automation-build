@@ -117,7 +117,7 @@ jobs:
           EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           EXPO_APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           EXPO_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
-          EXPO_APPLE_API_KEY_PATH: ${{ secrets.APPLE_P8 }}
+          EXPO_APPLE_API_KEY_PATH: fastlane/AuthKey.p8
         run: eas build -p ios --local --non-interactive
 
       - name: Upload to App Store
