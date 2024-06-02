@@ -85,7 +85,7 @@ jobs:
 
       - name: Create App ID if not exists
         run: |
-          fastlane produce -u ${{ secrets.APPLE_ID }} -a $BUNDLE_ID --skip_itc
+          fastlane produce -u ${{ secrets.APPLE_ID }} -a $BUNDLE_ID --skip_itc --api_key_path fastlane/api_key.json
 
       - name: Create provisioning profiles
         run: |
