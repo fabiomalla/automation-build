@@ -145,9 +145,6 @@ jobs:
 
       - name: Run Fastlane
         run: fastlane create_app
-
-      - name: Run Fastlane
-        run: fastlane create_app
           
       - name: Create credentials.json
         run: |
