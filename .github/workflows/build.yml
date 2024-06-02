@@ -113,6 +113,7 @@ jobs:
                 sku: ENV['BUNDLE_ID'].gsub('.', '-'),
                 bundle_id: ENV['BUNDLE_ID']
               )
+              UI.message("Created app: #{app.name}")
             else
               UI.message('Main app already exists. Skipping creation.')
             end
@@ -126,6 +127,7 @@ jobs:
                 sku: ENV['EXTENSION_BUNDLE_ID'].gsub('.', '-'),
                 bundle_id: ENV['EXTENSION_BUNDLE_ID']
               )
+              UI.message("Created app extension: #{app_extension.name}")
             else
               UI.message('OneSignal Notification Service Extension app already exists. Skipping creation.')
             end
