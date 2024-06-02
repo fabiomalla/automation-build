@@ -80,7 +80,7 @@ jobs:
       - name: Decode and Create Certificate and Provisioning Profile
         run: |
           echo "${{ secrets.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
-          security import certificate.p12 -P "${{ secrets.CERT_P12_PASSWORD }}" -A
+          security import certificate.p12 -P "${{ secrets.CERT_P12_PASSWORD }}" -A -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple: -s -k ${{ secrets.KEYCHAIN_PASSWORD }} build.keychain
           security find-identity -v -p codesigning
           
@@ -126,7 +126,7 @@ jobs:
           EXPO_APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           EXPO_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
           EXPO_APPLE_API_KEY_PATH: fastlane/AuthKey.p8
-        run: eas build -p ios --local --non-interactive --verbose
+        run: eas build -p ios --local --non-interactive
 
       - name: Upload to App Store
         env:
