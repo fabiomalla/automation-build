@@ -107,7 +107,7 @@ jobs:
             # Create the app if it doesn't exist
             unless app_exists?(ENV['BUNDLE_ID'])
               UI.message('Main app does not exist. Creating...')
-              app = Spaceship::ConnectAPI::App.create!(
+              app = Spaceship::ConnectAPI::App.create(
                 name: ENV['BUNDLE_TARGET'],
                 primary_locale: 'en-US',
                 sku: ENV['BUNDLE_ID'].gsub('.', '-'),
@@ -120,7 +120,7 @@ jobs:
             # Create the OneSignal Notification Service Extension app if it doesn't exist
             unless app_exists?(ENV['EXTENSION_BUNDLE_ID'])
               UI.message('OneSignal Notification Service Extension app does not exist. Creating...')
-              app_extension = Spaceship::ConnectAPI::App.create!(
+              app_extension = Spaceship::ConnectAPI::App.create(
                 name: ENV['BUNDLE_TARGET'] + ' OneSignal Extension',
                 primary_locale: 'en-US',
                 sku: ENV['EXTENSION_BUNDLE_ID'].gsub('.', '-'),
