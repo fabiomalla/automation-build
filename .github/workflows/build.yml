@@ -73,8 +73,8 @@ jobs:
         run: |
           mkdir -p fastlane
           echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
-          jq -n --arg key_id "${{ secrets.APPLE_KEY_ID }}" --arg issuer_id "${{ secrets.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" \
-          '{key_id: $key_id, issuer_id: $issuer_id, key: $key}' > fastlane/api_key.json
+          jq -n --arg key_id "${{ secrets.APPLE_KEY_ID }}" --arg issuer_id "${{ secrets.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
+          '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
 
       - name: Create provisioning profiles
         run: |
