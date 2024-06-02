@@ -86,8 +86,8 @@ jobs:
           AUTH_KEY_PATH: "fastlane/AuthKey.p8"
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
-          BUNDLE_ID: ${{ steps.extract-transform-name.outputs.BUNDLE_ID }}
-          EXTENSION_BUNDLE_ID: ${{ steps.extract-transform-name.outputs.EXTENSION_BUNDLE_ID }}
+          BUNDLE_ID: ${{ env.BUNDLE_ID }}
+          EXTENSION_BUNDLE_ID: ${{ env.EXTENSION_BUNDLE_ID }}
         run: fastlane create_app
 
       - name: Create credentials.json
