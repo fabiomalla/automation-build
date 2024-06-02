@@ -97,31 +97,36 @@ jobs:
             end
 
             # Authenticate with API key
-            Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(
+            token = Spaceship::ConnectAPI::Token.create(
               key_id: '${{ secrets.APPLE_KEY_ID }}',
               issuer_id: '${{ secrets.APPLE_ISSUER_ID }}',
               filepath: '$(pwd)/fastlane/AuthKey.p8'
             )
+            Spaceship::ConnectAPI.token = token
 
-            # Check if the main app exists
+            # Create the app if it doesn't exist
             unless app_exists?(ENV['BUNDLE_ID'])
               UI.message('Main app does not exist. Creating...')
-              produce(
-                username: '${{ secrets.APPLE_ID }}',
-                app_identifier: ENV['BUNDLE_ID'],
-                skip_itc: true
+              Spaceship::ConnectAPI::App.create(
+                name: ENV['BUNDLE_TARGET'],
+                primary_locale: 'en-US',
+                sku: ENV['BUNDLE_ID'].gsub('.', '-'),
+                bundle_id: ENV['BUNDLE_ID'],
+                platform: Spaceship::ConnectAPI::Platform::IOS
               )
             else
               UI.message('Main app already exists. Skipping creation.')
             end
 
-            # Check if the OneSignal Notification Service Extension app exists
+            # Create the OneSignal Notification Service Extension app if it doesn't exist
             unless app_exists?(ENV['EXTENSION_BUNDLE_ID'])
               UI.message('OneSignal Notification Service Extension app does not exist. Creating...')
-              produce(
-                username: '${{ secrets.APPLE_ID }}',
-                app_identifier: ENV['EXTENSION_BUNDLE_ID'],
-                skip_itc: true
+              Spaceship::ConnectAPI::App.create(
+                name: ENV['BUNDLE_TARGET'] + ' OneSignal Extension',
+                primary_locale: 'en-US',
+                sku: ENV['EXTENSION_BUNDLE_ID'].gsub('.', '-'),
+                bundle_id: ENV['EXTENSION_BUNDLE_ID'],
+                platform: Spaceship::ConnectAPI::Platform::IOS
               )
             else
               UI.message('OneSignal Notification Service Extension app already exists. Skipping creation.')
@@ -139,6 +144,9 @@ jobs:
               filename: 'provisioning_profile_onesignal.mobileprovision'
             )
           end" > fastlane/Fastfile
+
+      - name: Run Fastlane
+        run: fastlane create_app
 
       - name: Run Fastlane
         run: fastlane create_app
