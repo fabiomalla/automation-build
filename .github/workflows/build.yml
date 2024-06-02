@@ -83,7 +83,7 @@ jobs:
           echo "SPACESHIP_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> $GITHUB_ENV
           echo "FASTLANE_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> $GITHUB_ENV
           echo "FASTLANE_USER=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
-          echo "FASTLANE_PASSWORD=${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}" >> $GITHUB_ENV
+          echo "FASTLANE_PASSWORD=${{ secrets.APPLE_PWD }}" >> $GITHUB_ENV
 
       - name: Create App ID if not exists
         env:
