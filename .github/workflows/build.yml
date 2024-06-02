@@ -77,14 +77,13 @@ jobs:
           
       - name: Configure Fastlane API Key
         run: |
-          mkdir -p fastlane
           echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
           jq -n --arg key_id "${{ secrets.APPLE_KEY_ID }}" --arg issuer_id "${{ secrets.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
           '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
 
       - name: Run Fastlane Create App
         env:
-          AUTH_KEY_PATH: "$(pwd)/fastlane/AuthKey.p8"
+          AUTH_KEY_PATH: "fastlane/AuthKey.p8"
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
           BUNDLE_ID: ${{ steps.extract-transform-name.outputs.BUNDLE_ID }}
@@ -122,7 +121,7 @@ jobs:
 
       - name: Upload to App Store
         env:
-          AUTH_KEY_PATH: "$(pwd)/fastlane/AuthKey.p8"
+          AUTH_KEY_PATH: "fastlane/AuthKey.p8"
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
         run: fastlane upload_to_app_store
