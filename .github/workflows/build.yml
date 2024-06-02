@@ -62,7 +62,9 @@ jobs:
         id: extract-transform-name
         run: |
           NAME=$(jq -r '.expo.name' app.json)
-          BUNDLE_ID=$(echo $NAME | tr -d ' ')
+          BUNDLE_TARGET=$(echo $NAME | tr -d ' ')
+          BUNDLE_ID=$(jq -r '.expo.ios.bundleIdentifier' app.json)
+          echo "BUNDLE_TARGET=$BUNDLE_TARGET" >> $GITHUB_ENV
           echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
 
       - name: Decode and Create Certificate and Provisioning Profile
@@ -76,14 +78,19 @@ jobs:
           jq -n --arg key_id "${{ secrets.APPLE_KEY_ID }}" --arg issuer_id "${{ secrets.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
           '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
 
+      - name: Set Fastlane environment variables
+        run: |
+          echo "export FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD=${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}" >> $GITHUB_ENV
+          echo "export SPACESHIP_CONNECT_API_KEY_PATH=fastlane/api_key.json" >> $GITHUB_ENV
+
       - name: Create App ID if not exists
         run: |
-          fastlane produce -u ${{ secrets.APPLE_ID }} -a $BUNDLE_ID --skip_itc --api_key_path fastlane/api_key.json
+          fastlane produce -u ${{ secrets.APPLE_ID }} -a $BUNDLE_ID --skip_itc
 
       - name: Create provisioning profiles
         run: |
-          fastlane sigh --app_identifier $BUNDLE_ID --output_path . --filename provisioning_profile.mobileprovision --api_key_path fastlane/api_key.json
-          fastlane sigh --app_identifier "${BUNDLE_ID}.OneSignalNotificationServiceExtension" --output_path . --filename provisioning_profile_onesignal.mobileprovision --api_key_path fastlane/api_key.json
+          fastlane sigh --app_identifier $BUNDLE_ID --output_path . --filename provisioning_profile.mobileprovision
+          fastlane sigh --app_identifier "${BUNDLE_ID}.OneSignalNotificationServiceExtension" --output_path . --filename provisioning_profile_onesignal.mobileprovision
 
       - name: Create credentials.json
         run: |
@@ -96,7 +103,7 @@ jobs:
                 },
                 "provisioningProfilePath": "provisioning_profile_onesignal.mobileprovision"
               },
-              "'$BUNDLE_ID'": {
+              "'$BUNDLE_TARGET'": {
                 "distributionCertificate": {
                   "path": "certificate.p12",
                   "password": "${{ secrets.CERT_P12_PASSWORD }}"
