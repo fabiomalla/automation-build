@@ -82,11 +82,12 @@ jobs:
 
       - name: Create Fastfile
         run: |
+          AUTH_KEY_PATH="$(pwd)/fastlane/AuthKey.p8"
           echo 'lane :create_app do
             api_key = app_store_connect_api_key(
               key_id: "${{ secrets.APPLE_KEY_ID }}",
               issuer_id: "${{ secrets.APPLE_ISSUER_ID }}",
-              key_filepath: "$(pwd)/fastlane/AuthKey.p8"
+              key_filepath: "'$AUTH_KEY_PATH'"
             )
 
             # Function to check if an app exists
@@ -100,7 +101,7 @@ jobs:
             token = Spaceship::ConnectAPI::Token.create(
               key_id: "${{ secrets.APPLE_KEY_ID }}",
               issuer_id: "${{ secrets.APPLE_ISSUER_ID }}",
-              filepath: "$(pwd)/fastlane/AuthKey.p8"
+              filepath: "'$AUTH_KEY_PATH'"
             )
             Spaceship::ConnectAPI.token = token
 
@@ -144,7 +145,6 @@ jobs:
               filename: "provisioning_profile_onesignal.mobileprovision"
             )
           end' > fastlane/Fastfile
-
       - name: Run Fastlane
         run: fastlane create_app
 
