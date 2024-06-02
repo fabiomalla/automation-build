@@ -86,11 +86,25 @@ jobs:
               issuer_id: '${{ secrets.APPLE_ISSUER_ID }}',
               key_filepath: '$(pwd)/fastlane/AuthKey.p8'
             )
-            produce(
-              api_key: api_key,
-              app_identifier: ENV['BUNDLE_ID'],
-              skip_itc: true
-            )
+            begin
+              app = Spaceship::ConnectAPI::App.find(ENV['BUNDLE_ID'])
+              if app
+                UI.message('App already exists. Skipping creation.')
+              else
+                produce(
+                  api_key: api_key,
+                  app_identifier: ENV['BUNDLE_ID'],
+                  skip_itc: true
+                )
+              end
+            rescue Spaceship::TunesClient::ITunesConnectError => e
+              UI.message('App does not exist. Creating new app.')
+              produce(
+                api_key: api_key,
+                app_identifier: ENV['BUNDLE_ID'],
+                skip_itc: true
+              )
+            end
             sigh(
               api_key: api_key,
               app_identifier: ENV['BUNDLE_ID'],
@@ -105,9 +119,11 @@ jobs:
             )
           end" > fastlane/Fastfile
 
+
       - name: Run Fastlane
         run: |
-          bundle exec fastlane create_app
+          fastlane create_app
+          
       - name: Create credentials.json
         run: |
           echo '{
