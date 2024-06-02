@@ -84,22 +84,18 @@ jobs:
           echo "SPACESHIP_CONNECT_API_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
           echo "SPACESHIP_CONNECT_API_KEY_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
 
-      - name: Create App ID if not exists
-        env:
-          SPACESHIP_CONNECT_API_KEY_PATH: $(pwd)/fastlane/api_key.json
-          SPACESHIP_CONNECT_API_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
-          SPACESHIP_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+      - name: Load Fastlane API Key
         run: |
-          fastlane produce --api_key_path $(pwd)/fastlane/api_key.json -a $BUNDLE_ID --skip_itc
+          fastlane run app_store_connect_api_key key_id:${{ secrets.APPLE_KEY_ID }} issuer_id:${{ secrets.APPLE_ISSUER_ID }} key_filepath:$(pwd)/fastlane/AuthKey.p8
+
+      - name: Create App ID if not exists
+        run: |
+          fastlane produce -a $BUNDLE_ID --skip_itc
 
       - name: Create provisioning profiles
-        env:
-          SPACESHIP_CONNECT_API_KEY_PATH: $(pwd)/fastlane/api_key.json
-          SPACESHIP_CONNECT_API_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
-          SPACESHIP_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
         run: |
-          fastlane sigh --api_key_path $(pwd)/fastlane/api_key.json --app_identifier $BUNDLE_ID --output_path . --filename provisioning_profile.mobileprovision
-          fastlane sigh --api_key_path $(pwd)/fastlane/api_key.json --app_identifier "${BUNDLE_TARGET}.OneSignalNotificationServiceExtension" --output_path . --filename provisioning_profile_onesignal.mobileprovision
+          fastlane sigh --app_identifier $BUNDLE_ID --output_path . --filename provisioning_profile.mobileprovision
+          fastlane sigh --app_identifier "${BUNDLE_TARGET}.OneSignalNotificationServiceExtension" --output_path . --filename provisioning_profile_onesignal.mobileprovision
 
       - name: Create credentials.json
         run: |
