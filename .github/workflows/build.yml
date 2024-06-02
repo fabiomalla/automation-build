@@ -53,4 +53,4 @@ jobs:
           EXPO_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
           EXPO_APPLE_API_KEY_PATH: AuthKey.p8
         run: |
-          eas build -p ios --local --non-interactive
+          eas build -p ios --local --non-interactive --profile production
