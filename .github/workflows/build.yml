@@ -93,6 +93,7 @@ jobs:
       - name: Run Fastlane Create App
         env:
           AUTH_KEY_PATH: "fastlane/AuthKey.p8"
+          APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
           BUNDLE_ID: ${{ env.BUNDLE_ID }}
