@@ -176,6 +176,25 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Extract app.json info
+        id: extract-transform-name
+        run: |
+          ANDROID_PACKAGE=$(jq -r '.expo.android.package' app.json)
+          APP_NAME=$(jq -r '.expo.name' app.json)
+          echo "ANDROID_PACKAGE=$ANDROID_PACKAGE" >> $GITHUB_ENV
+          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+
+      - name: Decode and Create Google Play Json Key
+        run: |
+          echo "${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" | base64 --decode > google_play_json_key.json
+
       - name: Build Android
         run: |
           npm run build:android
+
+      - name: Upload to Play Store
+        env:
+          ANDROID_PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
+          ANDROID_APP_NAME: ${{ env.APP_NAME }}
+          GOOGLE_PLAY_JSON_KEY: google_play_json_key.json
+        run: fastlane upload_aab_to_play_store
