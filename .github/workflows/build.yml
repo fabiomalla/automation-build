@@ -65,9 +65,11 @@ jobs:
           BUNDLE_TARGET=$(echo $NAME | tr -d ' ')
           BUNDLE_ID=$(jq -r '.expo.ios.bundleIdentifier' app.json)
           EXTENSION_BUNDLE_ID="${BUNDLE_ID}.OneSignalNotificationServiceExtension"
+          APP_NAME=$(jq -r '.expo.name' app.json)
           echo "BUNDLE_TARGET=$BUNDLE_TARGET" >> $GITHUB_ENV
           echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
           echo "EXTENSION_BUNDLE_ID=$EXTENSION_BUNDLE_ID" >> $GITHUB_ENV
+          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
 
       - name: Create Keychain
         run: |
@@ -97,6 +99,7 @@ jobs:
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
           BUNDLE_ID: ${{ env.BUNDLE_ID }}
           EXTENSION_BUNDLE_ID: ${{ env.EXTENSION_BUNDLE_ID }}
+          APP_NAME: ${{ env.APP_NAME }}
         run: fastlane create_app
 
       - name: Create credentials.json
