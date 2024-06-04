@@ -20,6 +20,9 @@ jobs:
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
 
+      - name: Select Xcode version
+        run: sudo xcode-select -s '/Applications/Xcode_15.2.app/Contents/Developer'
+
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
