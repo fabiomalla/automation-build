@@ -216,7 +216,7 @@ jobs:
         run: |
           npm run build:android
 
-      - name: Upload update to Play Store 🚀
+      - name: Upload update to the Play Store 🚀
         if: env.APP_VERSION != '1.0.0'
         env:
           ANDROID_PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
