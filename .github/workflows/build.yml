@@ -68,10 +68,12 @@ jobs:
           BUNDLE_TARGET=$(echo $NAME | tr -d ' ')
           BUNDLE_ID=$(jq -r '.expo.ios.bundleIdentifier' app.json)
           EXTENSION_BUNDLE_ID="${BUNDLE_ID}.OneSignalNotificationServiceExtension"
+          APP_VERSION=$(jq -r '.expo.version' app.json)
           APP_NAME=$(jq -r '.expo.name' app.json)
           echo "BUNDLE_TARGET=$BUNDLE_TARGET" >> $GITHUB_ENV
           echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
           echo "EXTENSION_BUNDLE_ID=$EXTENSION_BUNDLE_ID" >> $GITHUB_ENV
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
 
       - name: Create Keychain
@@ -138,6 +140,7 @@ jobs:
           AUTH_KEY_PATH: "fastlane/AuthKey.p8"
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+          SKIP_SCREENSHOTS: ${{ env.APP_VERSION != "1.0.0 }}
         run: fastlane upload_ipa_to_app_store
 
   build_android:
@@ -184,8 +187,10 @@ jobs:
         run: |
           ANDROID_PACKAGE=$(jq -r '.expo.android.package' app.json)
           APP_NAME=$(jq -r '.expo.name' app.json)
+          APP_VERSION=$(jq -r '.expo.version' app.json)
           echo "ANDROID_PACKAGE=$ANDROID_PACKAGE" >> $GITHUB_ENV
           echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
 
       - name: Decode and Create Google Play Json Key
         run: |
@@ -195,8 +200,17 @@ jobs:
         run: |
           npm run build:android
 
-      - name: Upload to Play Store
+      - name: Upload update to Play Store 🚀
+        if: env.APP_VERSION != '1.0.0'
         env:
           ANDROID_PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
           GOOGLE_PLAY_JSON_KEY: google_play_json_key.json
+        run: fastlane upload_aab_to_play_store
+
+      - name: Create the app on the Play Store 📲
+        if: env.APP_VERSION == '1.0.0'
+        env:
+          APP_NAME: ${{ env.APP_NAME }}
+          GOOGLE_PLAY_EMAIL: ${{ secrets.GOOGLE_PLAY_EMAIL }}
+          GOOGLE_PLAY_PASSWORD: ${{ secrets.GOOGLE_PLAY_PASSWORD }}
         run: fastlane upload_aab_to_play_store
