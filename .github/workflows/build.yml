@@ -127,6 +127,14 @@ jobs:
             }
           }' > ./credentials.json
 
+      - name: Create detox build to take screenshots
+        if: ${{ env.APP_VERSION == "1.0.0" }}
+        run: npm run build:ios:test
+
+      - name: Take app screenshots
+        if: ${{ env.APP_VERSION == "1.0.0" }}
+        run: npm run generate:ios:screenshots
+
       - name: Build iOS
         env:
           EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -195,6 +203,14 @@ jobs:
       - name: Decode and Create Google Play Json Key
         run: |
           echo "${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" | base64 --decode > google_play_json_key.json
+
+      - name: Create detox build to take screenshots
+        if: ${{ env.APP_VERSION == "1.0.0" }}
+        run: npm run build:android:test
+
+      - name: Take app screenshots
+        if: ${{ env.APP_VERSION == "1.0.0" }}
+        run: npm run generate:android:screenshots
 
       - name: Build Android
         run: |
