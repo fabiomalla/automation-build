@@ -241,7 +241,7 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           force-avd-creation: false
-          emulator-options: -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: echo "Generated AVD snapshot for caching."
 
@@ -254,7 +254,7 @@ jobs:
           arch: x86_64
           profile: Nexus 6
           force-avd-creation: false
-          emulator-options: -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: echo "Set up Android Emulator."
 
