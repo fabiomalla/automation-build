@@ -239,16 +239,6 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: AVD cache
-        if: ${{ env.APP_VERSION == '1.0.0' }}
-        uses: actions/cache@v4
-        id: avd-cache
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-33
-
       - name: Take app screenshots on Android Emulator 🤖
         if: ${{ env.APP_VERSION == '1.0.0' }}
         uses: reactivecircus/android-emulator-runner@v2
