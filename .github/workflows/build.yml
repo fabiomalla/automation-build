@@ -214,19 +214,19 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # - name: Decode and Create Google Play Json Key
-      #   run: |
-      #     echo "${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" | base64 --decode > google_play_json_key.json
+      - name: Decode and Create Google Play Json Key
+        run: |
+          echo "${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" | base64 --decode > google_play_json_key.json
 
-      # - name: Create detox build to take screenshots
-      #   if: ${{ env.APP_VERSION == '1.0.0' }}
-      #   run: npm run build:android:test
+      - name: Create detox build to take screenshots
+        if: ${{ env.APP_VERSION == '1.0.0' }}
+        run: npm run build:android:test
 
-      # - name: Decompress detox build artifact
-      #   if: ${{ env.APP_VERSION == '1.0.0' }}
-      #   run: |
-      #     mkdir -p ./builds
-      #     tar -xzvf build-*.tar.gz -C ./builds
+      - name: Decompress detox build artifact
+        if: ${{ env.APP_VERSION == '1.0.0' }}
+        run: |
+          mkdir -p ./builds
+          tar -xzvf build-*.tar.gz -C ./builds
 
       - name: Enable KVM for running Android Emulator
         if: ${{ env.APP_VERSION == '1.0.0' }}
