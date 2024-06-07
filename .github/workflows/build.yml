@@ -229,6 +229,7 @@ jobs:
       - name: Decompress detox build artifact
         if: ${{ env.APP_VERSION == '1.0.0' }}
         run: |
+          mkdir -p ./builds
           tar -xzvf build-*.tar.gz -C ./builds
 
       - name: Enable KVM for running Android Emulator
