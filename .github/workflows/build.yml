@@ -166,12 +166,12 @@ jobs:
   build_android:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout the Private Repository
-        uses: actions/checkout@v3
-        with:
-          repository: Hantex9/easybook-app-refactor
-          token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
-          ref: ${{ github.event.inputs.branch }}
+      # - name: Checkout the Private Repository
+      #   uses: actions/checkout@v3
+      #   with:
+      #     repository: Hantex9/easybook-app-refactor
+      #     token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
+      #     ref: ${{ github.event.inputs.branch }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -189,21 +189,21 @@ jobs:
       # - name: For act to work (local testing)
       #   run:  npm -g install yarn
 
-      - name: Setup EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+      # - name: Setup EAS
+      #   uses: expo/expo-github-action@v8
+      #   with:
+      #     eas-version: latest
+      #     token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Extract app.json info
-        id: extract-transform-name
-        run: |
-          ANDROID_PACKAGE=$(jq -r '.expo.android.package' app.json)
-          APP_NAME=$(jq -r '.expo.name' app.json)
-          APP_VERSION=$(jq -r '.expo.version' app.json)
-          echo "ANDROID_PACKAGE=$ANDROID_PACKAGE" >> $GITHUB_ENV
-          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
-          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+      # - name: Extract app.json info
+      #   id: extract-transform-name
+      #   run: |
+      #     ANDROID_PACKAGE=$(jq -r '.expo.android.package' app.json)
+      #     APP_NAME=$(jq -r '.expo.name' app.json)
+      #     APP_VERSION=$(jq -r '.expo.version' app.json)
+      #     echo "ANDROID_PACKAGE=$ANDROID_PACKAGE" >> $GITHUB_ENV
+      #     echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+      #     echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
 
       # - name: Set up Java 17
       #   uses: actions/setup-java@v3
