@@ -261,7 +261,7 @@ jobs:
       #   run: fastlane upload_aab_to_play_store
 
       - name: Checkout Easybook Automation Repository
-        if: env.APP_VERSION == '1.0.0'
+        # if: env.APP_VERSION == '1.0.0'
         uses: actions/checkout@v3
         with:
           repository: Hantex9/easybook-release-automation-android
@@ -269,12 +269,12 @@ jobs:
           path: easybook-release-automation-android
 
       - name: Install Easybook release automation dependencies
-        if: env.APP_VERSION == '1.0.0'
+        # if: env.APP_VERSION == '1.0.0'
         run: npm install
         working-directory: easybook-release-automation-android
 
       - name: Create the app on the Play Store with Easybook Automation 📲
-        if: env.APP_VERSION == '1.0.0'
+        # if: env.APP_VERSION == '1.0.0'
         run: npm run start
         working-directory: easybook-release-automation-android
         env:
