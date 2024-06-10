@@ -11,6 +11,8 @@ on:
 jobs:
   build_ios:
     runs-on: macos-latest
+    env:
+      EAS_LOCAL_BUILD_SKIP_CLEANUP: 1
 
     steps:
       - name: Checkout the Private Repository
