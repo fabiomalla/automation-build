@@ -39,6 +39,11 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Select Xcode version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 15.3
+
       - name: Install dependencies
         run: npm install
 
@@ -142,14 +147,6 @@ jobs:
       # - name: Take app screenshots
       #   if: ${{ env.APP_VERSION == '1.0.0' }}
       #   run: npm run generate:ios:screenshots
-
-      - name: Select Xcode version
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: 15.3
-
-      - name: Verify Xcode version
-        run: xcodebuild -version
 
       - name: Build iOS
         env:
