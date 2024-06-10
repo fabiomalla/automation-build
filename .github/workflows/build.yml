@@ -156,7 +156,19 @@ jobs:
           EXPO_APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           EXPO_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
           EXPO_APPLE_API_KEY_PATH: fastlane/AuthKey.p8
-        run: eas build -p ios --local --non-interactive
+        run: npm run build:ios
+
+      - name: Display Xcode Logs on Failure
+        if: failure() # Esegui solo se i passi precedenti falliscono
+        run: |
+          LOG_DIR="/var/folders/lr/439_fwvd3m76p9vy50d57kcc0000gn/T/eas-build-local-nodejs"
+          LOG_FILE=$(find $LOG_DIR -name '*.log' -print -quit)
+          if [ -f "$LOG_FILE" ]; then
+            echo "Xcode build logs found at $LOG_FILE"
+            cat "$LOG_FILE"
+          else
+            echo "No Xcode build logs found."
+          fi
 
       - name: Upload to App Store
         env:
