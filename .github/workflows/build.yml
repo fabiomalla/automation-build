@@ -281,6 +281,7 @@ jobs:
         env:
           ANDROID_PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
           GOOGLE_PLAY_JSON_KEY: google_play_json_key.json
+          SKIP_SCREENSHOTS: ${{ env.FORCE_SCREENSHOTS == 'false' }}
         run: fastlane upload_aab_to_play_store
 
       - name: Checkout Easybook Automation Repository
