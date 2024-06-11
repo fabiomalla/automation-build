@@ -1,4 +1,4 @@
-name: Build and Deploy
+name: "Build and Deploy"
 
 on:
   workflow_dispatch:
@@ -21,6 +21,9 @@ jobs:
     runs-on: macos-latest
 
     steps:
+      - name: Set Workflow Name
+        run: echo "workflow_name=Build & Deploy - ${{ github.event.inputs.branch }}" >> $GITHUB_ENV
+
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
         with:
@@ -177,7 +180,7 @@ jobs:
           AUTH_KEY_PATH: "fastlane/AuthKey.p8"
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
-          SKIP_SCREENSHOTS: ${{ env.APP_VERSION != '1.0.0' }}
+          SKIP_SCREENSHOTS: ${{ env.FORCE_SCREENSHOTS == 'false' }}
         run: fastlane upload_ipa_to_app_store
 
   build_android:
