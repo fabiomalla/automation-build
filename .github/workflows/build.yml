@@ -1,4 +1,4 @@
-name: "Build and Deploy"
+run-name: ${{ github.event.inputs.branch || 'Build and Deploy' }}
 
 on:
   workflow_dispatch:
@@ -21,9 +21,6 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Set Workflow Name
-        run: echo "workflow_name=Build & Deploy - ${{ github.event.inputs.branch }}" >> $GITHUB_ENV
-
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
         with:
