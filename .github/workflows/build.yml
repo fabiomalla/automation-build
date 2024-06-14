@@ -44,7 +44,7 @@ jobs:
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
-          eas-version: latest
+          eas-version: 9.2.0
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Select Xcode version
@@ -207,7 +207,7 @@ jobs:
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
-          eas-version: latest
+          eas-version: 9.2.0
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Extract app.json info
