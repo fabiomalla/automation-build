@@ -56,12 +56,7 @@ jobs:
           fi
 
       - name: Install fastlane
-        run: |
-          if ! command -v fastlane &> /dev/null; then
-            brew install fastlane
-          else
-            echo "fastlane is already installed"
-          fi
+        run: brew install fastlane
 
       - name: Extract and transform app name from app.json
         id: extract-transform-name
@@ -194,6 +189,9 @@ jobs:
         with:
           eas-version: 9.2.0
           token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install fastlane
+        run: brew install fastlane
 
       - name: Extract app.json info
         id: extract-transform-name
