@@ -268,8 +268,6 @@ jobs:
           avd-name: Nexus_6_API_33
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disk-size: 6000M
-          heap-size: 600M
           disable-animations: true
           script: npm run generate:android:screenshots
 
