@@ -172,7 +172,7 @@ jobs:
 
     steps:
       - name: Checkout the Private Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: Hantex9/easybook-app-refactor
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
@@ -257,6 +257,8 @@ jobs:
           avd-name: Nexus_6_API_33
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disk-size: 6000M
+          heap-size: 600M
           disable-animations: true
           script: npm run generate:android:screenshots
 
