@@ -19,18 +19,7 @@ jobs:
   build_ios:
     runs-on: macos-latest
 
-    steps:
-      - name: Delete unnecessary tools 🔧
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          android: false # Keep Don't remove Android tools
-          tool-cache: true # Remove image tool cache - rm -rf "$AGENT_TOOLSDIRECTORY"
-          dotnet: true # rm -rf /usr/share/dotnet
-          haskell: true # rm -rf /opt/ghc...
-          swap-storage: true # rm -f /mnt/swapfile (4GiB)
-          docker-images: false # Takes 16s (`nowinandroid`), enable if needed in the future
-          large-packages: false # includes google-cloud-sdk and it's slow
-          
+    steps:          
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
         with:
@@ -47,7 +36,6 @@ jobs:
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
-          eas-version: 9.2.0
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Select Xcode version
@@ -209,7 +197,6 @@ jobs:
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
-          eas-version: 9.2.0
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install Ruby and Fastlane
