@@ -138,6 +138,10 @@ jobs:
           brew tap wix/brew
           brew install applesimutils
 
+      - name: Detox rebuild framework cache
+        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+        run: yarn detox rebuild-framework-cache
+
       - name: Create detox build to take screenshots
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: npm run build:ios:test
