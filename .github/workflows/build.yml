@@ -145,7 +145,7 @@ jobs:
           APPLE_ID: ${{ env.APPLE_ID }}
           APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
           SIGH_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
-          SIGH_API_KEY_PATH: "fastlane/AuthKey.p8"
+          SIGH_API_KEY_PATH: "fastlane/api_key.json"
           APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
           BUNDLE_ID: ${{ env.BUNDLE_ID }}
           EXTENSION_BUNDLE_ID: ${{ env.EXTENSION_BUNDLE_ID }}
