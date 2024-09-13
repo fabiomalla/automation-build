@@ -232,6 +232,18 @@ jobs:
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
 
+      # Step per controllare se esiste lorenzo.txt e settare USE_LORENZO
+      - name: Check if lorenzo.txt exists
+        id: check_lorenzo
+        run: |
+          if [ -f "lorenzo.txt" ]; then
+            echo "Lorenzo file found."
+            echo "USE_LORENZO=true" >> $GITHUB_ENV
+          else
+            echo "Lorenzo file not found."
+            echo "USE_LORENZO=false" >> $GITHUB_ENV
+          fi
+
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
