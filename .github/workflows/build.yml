@@ -23,7 +23,7 @@ jobs:
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
         with:
-          repository: Hantex9/easybook-app-refactor
+          repository: <nome>/easybook-app-refactor
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
 
@@ -34,10 +34,6 @@ jobs:
           if [ -f "lorenzo.txt" ]; then
             echo "Lorenzo file found."
             echo "USE_LORENZO=true" >> $GITHUB_ENV
-          else
-            echo "Lorenzo file not found."
-            echo "USE_LORENZO=false" >> $GITHUB_ENV
-          fi
       
       # Step per settare le variabili d'ambiente basato su USE_LORENZO e gestire il file APPLE_P8
       - name: Set environment variables for iOS and handle APPLE_P8
@@ -51,16 +47,6 @@ jobs:
             echo "CERT_P12_BASE64=${{ secrets.LORENZO_CERT_P12_BASE64 }}" >> $GITHUB_ENV
             echo "CERT_P12_PASSWORD=${{ secrets.LORENZO_CERT_P12_PASSWORD }}" >> $GITHUB_ENV
             echo "APPLE_P8=${{ secrets.LORENZO_APPLE_P8 }}" >> $GITHUB_ENV
-          else
-            echo "Setting default environment variables"
-            echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
-            echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
-            echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
-            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
-            echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64 }}" >> $GITHUB_ENV
-            echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
-            echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
-          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -228,7 +214,7 @@ jobs:
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
         with:
-          repository: Hantex9/easybook-app-refactor
+          repository: <nome>/easybook-app-refactor
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
 
@@ -354,7 +340,7 @@ jobs:
         if: env.APP_VERSION == '1.0.0'
         uses: actions/checkout@v3
         with:
-          repository: Hantex9/easybook-release-automation-android
+          repository: <nome>/easybook-release-automation-android
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           path: easybook-release-automation-android
 
