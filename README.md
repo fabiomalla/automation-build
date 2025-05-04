@@ -1,2 +1,2 @@
-# easybook-app-build
-Repository used to build &amp; deploy easybook app
+# automation-build
+Repository used to build &amp; deploy automation app
