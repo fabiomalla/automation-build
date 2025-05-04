@@ -23,7 +23,7 @@ jobs:
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
         with:
-          repository: <nome>/easybook-app-refactor
+          repository: lorenzomalla/easybook-app-refactor
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
 
@@ -40,13 +40,13 @@ jobs:
         run: |
           if [[ "$USE_LORENZO" == "true" ]]; then
             echo "Setting LORENZO-prefixed environment variables"
-            echo "APPLE_ID=${{ secrets.LORENZO_APPLE_ID }}" >> $GITHUB_ENV
-            echo "APPLE_ISSUER_ID=${{ secrets.LORENZO_APPLE_ISSUER_ID }}" >> $GITHUB_ENV
-            echo "APPLE_KEY_ID=${{ secrets.LORENZO_APPLE_KEY_ID }}" >> $GITHUB_ENV
-            echo "APPLE_TEAM_ID=${{ secrets.LORENZO_APPLE_TEAM_ID }}" >> $GITHUB_ENV
-            echo "CERT_P12_BASE64=${{ secrets.LORENZO_CERT_P12_BASE64 }}" >> $GITHUB_ENV
-            echo "CERT_P12_PASSWORD=${{ secrets.LORENZO_CERT_P12_PASSWORD }}" >> $GITHUB_ENV
-            echo "APPLE_P8=${{ secrets.LORENZO_APPLE_P8 }}" >> $GITHUB_ENV
+            echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
+            echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
+            echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
+            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+            echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64 }}" >> $GITHUB_ENV
+            echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
+            echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -118,7 +118,7 @@ jobs:
       - name: Configure Fastlane API Key
         run: |
           if [[ "$USE_LORENZO" == "true" ]]; then
-            echo "${{ secrets.LORENZO_APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
+            echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
           else
             echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
           fi
@@ -214,7 +214,7 @@ jobs:
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
         with:
-          repository: <nome>/easybook-app-refactor
+          repository: lorenzomalla/easybook-app-refactor
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
 
@@ -254,9 +254,9 @@ jobs:
       - name: Set environment variables for Android
         run: |
           if [[ "$USE_LORENZO" == "true" ]]; then
-            echo "GOOGLE_PLAY_EMAIL=${{ secrets.LORENZO_GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
-            echo "GOOGLE_PLAY_PASSWORD=${{ secrets.LORENZO_GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
-            echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.LORENZO_GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
+            echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
+            echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
+            echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
           else
             echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
             echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
@@ -340,7 +340,7 @@ jobs:
         if: env.APP_VERSION == '1.0.0'
         uses: actions/checkout@v3
         with:
-          repository: <nome>/easybook-release-automation-android
+          repository: lorenzomalla/easybook-release-automation-android
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           path: easybook-release-automation-android
 
