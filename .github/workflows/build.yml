@@ -113,8 +113,12 @@ jobs:
         run: |
           if [[ "$USE_LORENZO" == "true" ]]; then
             echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
-          jq -n --arg key_id "${{ env.APPLE_KEY_ID }}" --arg issuer_id "${{ env.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
-            '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
+            jq -n --arg key_id "${{ env.APPLE_KEY_ID }}" \
+                   --arg issuer_id "${{ env.APPLE_ISSUER_ID }}" \
+                   --arg key "$(cat fastlane/AuthKey.p8)" \
+                   --argjson in_house false \
+                   '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
+          fi
       
       - name: Check if AuthKey.p8 exists
         run: ls -la fastlane && file fastlane/AuthKey.p8
