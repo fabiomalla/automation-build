@@ -28,25 +28,19 @@ jobs:
           ref: ${{ github.event.inputs.branch }}
 
       # Step per controllare se esiste lorenzo.txt e settare USE_LORENZO
-      - name: Check if lorenzo.txt exists
-        id: check_lorenzo
-        run: |
-          if [ -f "lorenzo.txt" ]; then
-            echo "Lorenzo file found."
-            echo "USE_LORENZO=true" >> $GITHUB_ENV
-      
-      # Step per settare le variabili d'ambiente basato su USE_LORENZO e gestire il file APPLE_P8
+      - name: Set USE_LORENZO to true
+        run: echo "USE_LORENZO=true" >> $GITHUB_ENV
+
       - name: Set environment variables for iOS and handle APPLE_P8
         run: |
-          if [[ "$USE_LORENZO" == "true" ]]; then
-            echo "Setting LORENZO-prefixed environment variables"
-            echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
-            echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
-            echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
-            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
-            echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64 }}" >> $GITHUB_ENV
-            echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
-            echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
+          echo "Setting LORENZO-prefixed environment variables"
+          echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
+          echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
+          echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
+          echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+          echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64 }}" >> $GITHUB_ENV
+          echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
+          echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -219,16 +213,8 @@ jobs:
           ref: ${{ github.event.inputs.branch }}
 
       # Step per controllare se esiste lorenzo.txt e settare USE_LORENZO
-      - name: Check if lorenzo.txt exists
-        id: check_lorenzo
-        run: |
-          if [ -f "lorenzo.txt" ]; then
-            echo "Lorenzo file found."
-            echo "USE_LORENZO=true" >> $GITHUB_ENV
-          else
-            echo "Lorenzo file not found."
-            echo "USE_LORENZO=false" >> $GITHUB_ENV
-          fi
+      - name: Set USE_LORENZO to true
+        run: echo "USE_LORENZO=true" >> $GITHUB_ENV
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
