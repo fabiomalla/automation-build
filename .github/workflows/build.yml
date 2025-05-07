@@ -27,13 +27,10 @@ jobs:
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
 
-      # Step per controllare se esiste lorenzo.txt e settare USE_LORENZO
-      - name: Set USE_LORENZO to true
-        run: echo "USE_LORENZO=true" >> $GITHUB_ENV
-
+      # Step per settare le variabili d'ambiente basato su USE_LORENZO e gestire il file APPLE_P8
       - name: Set environment variables for iOS and handle APPLE_P8
         run: |
-          echo "Setting LORENZO-prefixed environment variables"
+          echo "Setting default environment variables"
           echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
           echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
           echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
@@ -41,7 +38,7 @@ jobs:
           echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64 }}" >> $GITHUB_ENV
           echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
           echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
-          echo "AUTH_KEY_PATH=$(pwd)/fastlane/AuthKey.p8" >> $GITHUB_ENV
+
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -113,31 +110,23 @@ jobs:
       - name: Configure Fastlane API Key
         run: |
           if [[ "$USE_LORENZO" == "true" ]]; then
+            echo "${{ secrets.LORENZO_APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
+          else
             echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
-            jq -n --arg key_id "${{ env.APPLE_KEY_ID }}" \
-                   --arg issuer_id "${{ env.APPLE_ISSUER_ID }}" \
-                   --arg key "$(cat fastlane/AuthKey.p8)" \
-                   --argjson in_house false \
-                   '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
           fi
-      
-      - name: Print ENV
-        run: printenv | grep AUTH_KEY
-      
-      - name: Check if AuthKey.p8 exists
-        run: ls -la fastlane && file fastlane/AuthKey.p8
+          jq -n --arg key_id "${{ env.APPLE_KEY_ID }}" --arg issuer_id "${{ env.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
+            '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
 
       - name: Run Fastlane Create App
-        run: |
-          echo "🔍 AUTH_KEY_PATH=$AUTH_KEY_PATH"
-          fastlane create_app
         env:
+          AUTH_KEY_PATH: "fastlane/AuthKey.p8"
           APPLE_ID: ${{ env.APPLE_ID }}
           APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
           BUNDLE_ID: ${{ env.BUNDLE_ID }}
           EXTENSION_BUNDLE_ID: ${{ env.EXTENSION_BUNDLE_ID }}
           APP_NAME: ${{ env.APP_NAME }}
+        run: fastlane create_app
 
       - name: Create credentials.json
         run: |
@@ -221,10 +210,6 @@ jobs:
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
 
-      # Step per controllare se esiste lorenzo.txt e settare USE_LORENZO
-      - name: Set USE_LORENZO to true
-        run: echo "USE_LORENZO=true" >> $GITHUB_ENV
-
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
@@ -248,15 +233,9 @@ jobs:
       # Step to set environment variables for Android based on lorenzo.txt
       - name: Set environment variables for Android
         run: |
-          if [[ "$USE_LORENZO" == "true" ]]; then
-            echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
-            echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
-            echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
-          else
-            echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
-            echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
-            echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
-          fi
+          echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
+          echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
+          echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
 
       - name: Extract app.json info
         id: extract-transform-name
@@ -305,7 +284,7 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      
+
       - name: Take app screenshots on Android Emulator 🤖
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         uses: reactivecircus/android-emulator-runner@v2
@@ -318,24 +297,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: echo "emulator is starting..."
-      
-      - name: Fix adb and wait for device
-        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
-        run: |
-          adb kill-server
-          adb start-server
-          adb devices
-          adb wait-for-device
-          until adb shell getprop sys.boot_completed | grep -m 1 '1'; do
-            echo "⏳ Waiting for emulator to boot..."
-            sleep 5
-          done
-          echo "✅ Emulator is ready"
-      
-      - name: Run Detox screenshot test
-        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
-        run: npm run generate:android:screenshots
+          script: npm run generate:android:screenshots
 
       - name: Build Android
         run: npm run build:android
