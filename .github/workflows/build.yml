@@ -68,8 +68,10 @@ jobs:
             echo "jq is already installed"
           fi
 
-      - name: Install fastlane
-        run: brew install fastlane
+      - name: Install stable fastlane (2.226.1)
+        run: |
+          sudo gem uninstall fastlane -aIx || true
+          sudo gem install fastlane -v 2.226.1
 
       - name: Extract and transform app name from app.json
         id: extract-transform-name
