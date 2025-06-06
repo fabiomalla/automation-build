@@ -70,7 +70,7 @@ jobs:
 
       - name: Scarica e installa fastlane 2.227.0 patchata
         run: |
-          curl -L -o fastlane-2.227.0.gem https://raw.githubusercontent.com/fabiomalla/automation-build/master/fastlane-2.227.0.gem
+          curl -L -o fastlane-2.227.0.gem https://raw.githubusercontent.com/fabiomalla/automation-build/master/fastlane-2.227.3.pre.local.gem
       
           brew install rbenv
           export RBENV_ROOT="$HOME/.rbenv"
