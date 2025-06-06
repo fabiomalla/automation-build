@@ -68,12 +68,10 @@ jobs:
             echo "jq is already installed"
           fi
 
-      - name: Copy fastlane gem from repo
+      - name: Scarica e installa fastlane 2.227.0 patchata
         run: |
-          cp $GITHUB_WORKSPACE/fastlane-2.227.0.gem ./
-
-      - name: Install Fastlane da .gem locale (2.227.0 patchata)
-        run: |
+          curl -L -o fastlane-2.227.0.gem https://raw.githubusercontent.com/fabiomalla/automation-build/master/fastlane-2.227.0.gem
+      
           brew install rbenv
           export RBENV_ROOT="$HOME/.rbenv"
           export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH"
@@ -81,7 +79,7 @@ jobs:
           rbenv install 3.3.0 --skip-existing
           rbenv global 3.3.0
       
-          gem install ./fastlane-2.227.0.gem
+          gem install fastlane-2.227.0.gem
       
           fastlane --version
 
