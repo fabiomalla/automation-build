@@ -68,18 +68,19 @@ jobs:
             echo "jq is already installed"
           fi
 
-      - name: Scarica e installa fastlane patchata
+      - name: Scarica e installa fastlane patchata globalmente
         run: |
-          curl -L -o fastlane.gem https://raw.githubusercontent.com/fabiomalla/automation-build/master/fastlane-2.227.4.pre.local.gem
+          curl -L -o fastlane-2.227.4.pre.local.gem https://raw.githubusercontent.com/fabiomalla/automation-build/master/fastlane-2.227.4.pre.local.gem
       
-          brew install rbenv
+          brew install rbenv ruby-build
           export RBENV_ROOT="$HOME/.rbenv"
           export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH"
           eval "$(rbenv init - bash)"
+      
           rbenv install 3.3.0 --skip-existing
           rbenv global 3.3.0
       
-          gem install fastlane.gem
+          gem install --no-document fastlane-2.227.4.pre.local.gem
           fastlane --version
 
       - name: Controllo versione Fastlane installata
@@ -147,7 +148,7 @@ jobs:
           BUNDLE_ID: ${{ env.BUNDLE_ID }}
           EXTENSION_BUNDLE_ID: ${{ env.EXTENSION_BUNDLE_ID }}
           APP_NAME: ${{ env.APP_NAME }}
-        run: bundle exec fastlane create_app
+        run: fastlane create_app
 
       - name: Create credentials.json
         run: |
@@ -207,7 +208,7 @@ jobs:
           APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
           SKIP_SCREENSHOTS: ${{ env.FORCE_SCREENSHOTS == 'false' }}
-        run: bundle exec fastlane upload_ipa_to_app_store
+        run: fastlane upload_ipa_to_app_store
 
   build_android:
     runs-on: ubuntu-latest
