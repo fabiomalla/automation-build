@@ -68,29 +68,22 @@ jobs:
             echo "jq is already installed"
           fi
 
-      - name: Install Ruby 3.3.0 via rbenv
+      - name: Install patched Fastlane from fork
         run: |
           brew install rbenv
-          rbenv install 3.3.0 || true
+          export RBENV_ROOT="$HOME/.rbenv"
+          export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH"
+          eval "$(rbenv init - bash)"
+          rbenv install 3.3.0 --skip-existing
           rbenv global 3.3.0
-          echo 'eval "$(rbenv init - bash)"' >> ~/.bash_profile
-          source ~/.bash_profile
-          ruby -v
-      
-      - name: Install bundler
-        run: gem install bundler
-      
-      - name: Clone fastlane fork (with templateName fix)
-        run: |
+          gem install bundler
           git clone https://github.com/redreceipt/fastlane.git
           cd fastlane
           bundle install
           bundle exec rake build
           gem install pkg/fastlane-2.227.0.gem
           cd ..
-      
-      - name: Verify Fastlane version (should be patched)
-        run: fastlane --version
+          fastlane --version
 
       - name: Extract and transform app name from app.json
         id: extract-transform-name
