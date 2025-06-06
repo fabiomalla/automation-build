@@ -224,13 +224,15 @@ jobs:
           eas-version: 12.6.2
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Install Ruby and Fastlane
+      - name: Set up Fastlane 2.226.1 via Bundler
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ruby-full
-          echo 'export GEM_HOME=$HOME/.gem' >> $GITHUB_ENV
-          echo 'export PATH=$HOME/.gem/bin:$PATH' >> $GITHUB_ENV
-          gem install --user-install fastlane -NV
+          echo "source 'https://rubygems.org'" > Gemfile
+          echo "gem 'fastlane', '2.226.1'" >> Gemfile
+          bundle config set --local path vendor/bundle
+          bundle install
+
+      - name: Check Fastlane version
+        run: bundle exec fastlane --version
 
       # Step to set environment variables for Android based on lorenzo.txt
       - name: Set environment variables for Android
