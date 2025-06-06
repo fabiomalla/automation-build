@@ -40,6 +40,11 @@ jobs:
           gem install fastlane.gem
           fastlane --version
 
+      - name: Controllo versione Fastlane installata
+        run: |
+          which fastlane
+          fastlane --version
+
       # Step per settare le variabili d'ambiente basato su USE_LORENZO e gestire il file APPLE_P8
       - name: Set environment variables for iOS and handle APPLE_P8
         run: |
@@ -231,33 +236,6 @@ jobs:
         with:
           eas-version: 12.6.2
           token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Install patched Fastlane from redreceipt fork
-        run: |
-          # Setup Ruby 3.3.0 (evita problemi con Ruby 3.4.x)
-          brew install rbenv
-          export RBENV_ROOT="$HOME/.rbenv"
-          export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH"
-          eval "$(rbenv init - bash)"
-          rbenv install 3.3.0 --skip-existing
-          rbenv global 3.3.0
-      
-          # Installa bundler
-          gem install bundler
-      
-          # Clona il fork patchato
-          git clone https://github.com/redreceipt/fastlane.git fastlane-patched
-          cd fastlane-patched
-      
-          # Installa le dipendenze e costruisci la gem
-          bundle install
-          bundle exec rake build
-      
-          # Installa la gem locale
-          gem install pkg/fastlane-2.227.0.gem
-      
-          # Verifica versione
-          fastlane --version
 
       - name: Install Ruby and Fastlane
         run: |
