@@ -82,6 +82,12 @@ jobs:
           gem install fastlane.gem
           fastlane --version
 
+      - name: Installa Bundler e fastlane patchata
+        run: |
+          gem install bundler
+          bundle config set path 'vendor/bundle'
+          bundle install
+
       - name: Controllo versione Fastlane installata
         run: |
           which fastlane
@@ -147,7 +153,7 @@ jobs:
           BUNDLE_ID: ${{ env.BUNDLE_ID }}
           EXTENSION_BUNDLE_ID: ${{ env.EXTENSION_BUNDLE_ID }}
           APP_NAME: ${{ env.APP_NAME }}
-        run: fastlane create_app
+        run: bundle exec fastlane create_app
 
       - name: Create credentials.json
         run: |
@@ -207,7 +213,7 @@ jobs:
           APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
           SKIP_SCREENSHOTS: ${{ env.FORCE_SCREENSHOTS == 'false' }}
-        run: fastlane upload_ipa_to_app_store
+        run: bundle exec fastlane upload_ipa_to_app_store
 
   build_android:
     runs-on: ubuntu-latest
