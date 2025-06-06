@@ -236,12 +236,40 @@ jobs:
           eas-version: 12.6.2
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Set up Fastlane 2.226.1 via Bundler
+      - name: Install patched Fastlane from redreceipt fork
         run: |
-          echo "source 'https://rubygems.org'" > Gemfile
-          echo "gem 'fastlane', '2.226.1'" >> Gemfile
-          bundle config set --local path vendor/bundle
+          # Setup Ruby 3.3.0 (evita problemi con Ruby 3.4.x)
+          brew install rbenv
+          export RBENV_ROOT="$HOME/.rbenv"
+          export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH"
+          eval "$(rbenv init - bash)"
+          rbenv install 3.3.0 --skip-existing
+          rbenv global 3.3.0
+      
+          # Installa bundler
+          gem install bundler
+      
+          # Clona il fork patchato
+          git clone https://github.com/redreceipt/fastlane.git fastlane-patched
+          cd fastlane-patched
+      
+          # Installa le dipendenze e costruisci la gem
           bundle install
+          bundle exec rake build
+      
+          # Installa la gem locale
+          gem install pkg/fastlane-2.227.0.gem
+      
+          # Verifica versione
+          fastlane --version
+
+      - name: Install Ruby and Fastlane
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby-full
+          echo 'export GEM_HOME=$HOME/.gem' >> $GITHUB_ENV
+          echo 'export PATH=$HOME/.gem/bin:$PATH' >> $GITHUB_ENV
+          gem install --user-install fastlane -NV
 
       - name: Check Fastlane version
         run: bundle exec fastlane --version
