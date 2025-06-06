@@ -36,7 +36,7 @@ jobs:
           rbenv install 3.3.0 --skip-existing
           rbenv global 3.3.0
       
-          curl -L -o fastlane.gem https://raw.githubusercontent.com/fabiomalla/automation-build/master/fastlane-2.227.3.pre.local.gem
+          curl -L -o fastlane.gem https://raw.githubusercontent.com/fabiomalla/automation-build/master/fastlane-2.227.4.pre.local.gem
           gem install fastlane.gem
           fastlane --version
 
