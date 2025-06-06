@@ -70,6 +70,8 @@ jobs:
 
       - name: Scarica e installa fastlane patchata
         run: |
+          curl -L -o fastlane.gem https://raw.githubusercontent.com/fabiomalla/automation-build/master/fastlane-2.227.4.pre.local.gem
+      
           brew install rbenv
           export RBENV_ROOT="$HOME/.rbenv"
           export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH"
@@ -77,7 +79,6 @@ jobs:
           rbenv install 3.3.0 --skip-existing
           rbenv global 3.3.0
       
-          curl -L -o fastlane.gem https://raw.githubusercontent.com/fabiomalla/automation-build/master/fastlane-2.227.2.gem
           gem install fastlane.gem
           fastlane --version
 
@@ -85,6 +86,11 @@ jobs:
         run: |
           which fastlane
           fastlane --version
+
+      - name: Debug fastlane path
+        run: |
+          which fastlane
+          ls -l $(which fastlane)
 
       - name: Extract and transform app name from app.json
         id: extract-transform-name
