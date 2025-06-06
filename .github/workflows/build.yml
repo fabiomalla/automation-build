@@ -68,7 +68,7 @@ jobs:
             echo "jq is already installed"
           fi
 
-      - name: Install patched Fastlane from fork
+      - name: Install Fastlane da .gem locale (2.227.0 patchata)
         run: |
           brew install rbenv
           export RBENV_ROOT="$HOME/.rbenv"
@@ -76,13 +76,9 @@ jobs:
           eval "$(rbenv init - bash)"
           rbenv install 3.3.0 --skip-existing
           rbenv global 3.3.0
-          gem install bundler
-          git clone https://github.com/redreceipt/fastlane.git
-          cd fastlane
-          bundle install
-          bundle exec rake build
-          gem install pkg/fastlane-2.227.0.gem
-          cd ..
+      
+          gem install ./fastlane-2.227.0.gem
+      
           fastlane --version
 
       - name: Extract and transform app name from app.json
