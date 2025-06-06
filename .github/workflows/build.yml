@@ -27,24 +27,6 @@ jobs:
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
 
-      - name: Scarica e installa fastlane patchata
-        run: |
-          brew install rbenv
-          export RBENV_ROOT="$HOME/.rbenv"
-          export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH"
-          eval "$(rbenv init - bash)"
-          rbenv install 3.3.0 --skip-existing
-          rbenv global 3.3.0
-      
-          curl -L -o fastlane.gem https://raw.githubusercontent.com/fabiomalla/automation-build/master/fastlane-2.227.2.gem
-          gem install fastlane.gem
-          fastlane --version
-
-      - name: Controllo versione Fastlane installata
-        run: |
-          which fastlane
-          fastlane --version
-
       # Step per settare le variabili d'ambiente basato su USE_LORENZO e gestire il file APPLE_P8
       - name: Set environment variables for iOS and handle APPLE_P8
         run: |
@@ -85,6 +67,24 @@ jobs:
           else
             echo "jq is already installed"
           fi
+
+      - name: Scarica e installa fastlane patchata
+        run: |
+          brew install rbenv
+          export RBENV_ROOT="$HOME/.rbenv"
+          export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH"
+          eval "$(rbenv init - bash)"
+          rbenv install 3.3.0 --skip-existing
+          rbenv global 3.3.0
+      
+          curl -L -o fastlane.gem https://raw.githubusercontent.com/fabiomalla/automation-build/master/fastlane-2.227.2.gem
+          gem install fastlane.gem
+          fastlane --version
+
+      - name: Controllo versione Fastlane installata
+        run: |
+          which fastlane
+          fastlane --version
 
       - name: Extract and transform app name from app.json
         id: extract-transform-name
@@ -244,9 +244,6 @@ jobs:
           echo 'export GEM_HOME=$HOME/.gem' >> $GITHUB_ENV
           echo 'export PATH=$HOME/.gem/bin:$PATH' >> $GITHUB_ENV
           gem install --user-install fastlane -NV
-
-      - name: Check Fastlane version
-        run: bundle exec fastlane --version
 
       # Step to set environment variables for Android based on lorenzo.txt
       - name: Set environment variables for Android
