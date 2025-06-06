@@ -82,12 +82,6 @@ jobs:
           gem install fastlane.gem
           fastlane --version
 
-      - name: Installa Bundler e fastlane patchata
-        run: |
-          gem install bundler
-          bundle config set path 'vendor/bundle'
-          bundle install
-
       - name: Controllo versione Fastlane installata
         run: |
           which fastlane
