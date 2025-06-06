@@ -68,6 +68,10 @@ jobs:
             echo "jq is already installed"
           fi
 
+      - name: Copy fastlane gem from repo
+        run: |
+          cp $GITHUB_WORKSPACE/fastlane-2.227.0.gem ./
+
       - name: Install Fastlane da .gem locale (2.227.0 patchata)
         run: |
           brew install rbenv
