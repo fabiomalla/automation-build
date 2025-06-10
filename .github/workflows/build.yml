@@ -68,11 +68,31 @@ jobs:
             echo "jq is already installed"
           fi
 
+      - name: Scarica e installa fastlane patchata globalmente
+        run: |
+          curl -L -o fastlane-2.227.4.pre.local.gem https://raw.githubusercontent.com/fabiomalla/automation-build/master/fastlane-2.227.4.pre.local.gem
+      
+          brew install rbenv ruby-build
+          export RBENV_ROOT="$HOME/.rbenv"
+          export PATH="$RBENV_ROOT/bin:$RBENV_ROOT/shims:$PATH"
+          eval "$(rbenv init - bash)"
+      
+          rbenv install 3.3.0 --skip-existing
+          rbenv global 3.3.0
+      
+          gem install --no-document fastlane-2.227.4.pre.local.gem
+          fastlane --version
+
+      - name: Controllo versione Fastlane installata
+        run: |
+          which fastlane
+          fastlane --version
+
       - name: Usa fastlane patchata come default nel PATH
         run: |
           export RBENV_ROOT="$HOME/.rbenv"
           export PATH="$RBENV_ROOT/shims:$RBENV_ROOT/bin:$PATH"
-          eval "$(rbenv init - bash)"Add commentMore actions
+          eval "$(rbenv init - bash)"
       
           echo "RBENV_ROOT=$RBENV_ROOT" >> $GITHUB_ENV
           echo "$RBENV_ROOT/bin" >> $GITHUB_PATH
@@ -80,6 +100,11 @@ jobs:
       
           which fastlane
           fastlane --version
+
+      - name: Debug fastlane path
+        run: |
+          which fastlane
+          ls -l $(which fastlane)
 
       - name: Extract and transform app name from app.json
         id: extract-transform-name
