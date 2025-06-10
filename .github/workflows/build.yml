@@ -68,8 +68,18 @@ jobs:
             echo "jq is already installed"
           fi
 
-      - name: Install fastlane
-        run: brew install fastlane
+      - name: Usa fastlane patchata come default nel PATH
+        run: |
+          export RBENV_ROOT="$HOME/.rbenv"
+          export PATH="$RBENV_ROOT/shims:$RBENV_ROOT/bin:$PATH"
+          eval "$(rbenv init - bash)"Add commentMore actions
+      
+          echo "RBENV_ROOT=$RBENV_ROOT" >> $GITHUB_ENV
+          echo "$RBENV_ROOT/bin" >> $GITHUB_PATH
+          echo "$RBENV_ROOT/shims" >> $GITHUB_PATH
+      
+          which fastlane
+          fastlane --version
 
       - name: Extract and transform app name from app.json
         id: extract-transform-name
