@@ -351,7 +351,8 @@ jobs:
       - name: Upload screenshots to Google Drive 📤
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
-          rclone copy ./screenshots gdrive:screenshots-easybook/${{ env.APP_NAME }}_${{ env.APP_VERSION }} --create-dirs
+          rclone mkdir "gdrive:screenshots-sibook/${{ env.APP_NAME }}_${{ env.APP_VERSION }}"
+          rclone copy ./screenshots "gdrive:screenshots-sibook/${{ env.APP_NAME }}_${{ env.APP_VERSION }}"
 
       - name: Build Android
         run: npm run build:android
