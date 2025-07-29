@@ -264,11 +264,6 @@ jobs:
         run: |
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
-      
-      - name: Upload screenshots to Google Drive 📤
-        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
-        run: |
-          rclone copy ./screenshots gdrive:screenshots-easybook/${{ env.APP_NAME }}_${{ env.APP_VERSION }} --create-dirs
 
       - name: Setup EAS
         uses: expo/expo-github-action@v8
@@ -352,6 +347,11 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: npm run generate:android:screenshots
+
+      - name: Upload screenshots to Google Drive 📤
+        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+        run: |
+          rclone copy ./screenshots gdrive:screenshots-easybook/${{ env.APP_NAME }}_${{ env.APP_VERSION }} --create-dirs
 
       - name: Build Android
         run: npm run build:android
