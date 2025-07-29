@@ -363,10 +363,10 @@ jobs:
           rclone mkdir "$DEST"
       
           echo "🔼 Copio screenshots..."
-          rclone copy ../fastlane/metadata/android/it-IT/images/phoneScreenshots "$DEST/phoneScreenshots" --create-empty-src-dirs
+          rclone copy ./fastlane/metadata/android/it-IT/images/phoneScreenshots "$DEST/phoneScreenshots" --create-empty-src-dirs
       
           echo "🔼 Copio icona/logo..."
-          rclone copy ../assets/images/logo-lg.png "$DEST/logo.png"
+          rclone copy ./assets/images/logo-lg.png "$DEST/logo.png"
 
       - name: Build Android
         run: npm run build:android
