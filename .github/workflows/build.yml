@@ -355,11 +355,18 @@ jobs:
           disable-animations: true
           script: npm run generate:android:screenshots
 
-      - name: Upload screenshots to Google Drive 📤
+      - name: Upload screenshots and logo to Google Drive 📤
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
-          rclone mkdir "gdrive:screenshots-sibook/${{ env.APP_NAME }}_${{ env.APP_VERSION }}"
-          rclone copy ./screenshots "gdrive:screenshots-sibook/${{ env.APP_NAME }}_${{ env.APP_VERSION }}"
+          DEST="gdrive:screenshots-sibook/${{ env.APP_NAME }}_${{ env.APP_VERSION }}"
+          echo "Creazione cartella su Drive: $DEST"
+          rclone mkdir "$DEST"
+      
+          echo "🔼 Copio screenshots..."
+          rclone copy ../fastlane/metadata/android/it-IT/images/phoneScreenshots "$DEST/phoneScreenshots" --create-empty-src-dirs
+      
+          echo "🔼 Copio icona/logo..."
+          rclone copy ../assets/images/logo-lg.png "$DEST/logo.png"
 
       - name: Build Android
         run: npm run build:android
