@@ -251,6 +251,25 @@ jobs:
           node-version-file: ".node-version"
           cache: "npm"
 
+      - name: Install rclone
+        run: |
+          curl -O https://downloads.rclone.org/rclone-current-linux-amd64.zip
+          unzip rclone-current-linux-amd64.zip
+          cd rclone-*-linux-amd64
+          sudo cp rclone /usr/bin/rclone
+          sudo chmod 755 /usr/bin/rclone
+          rclone version
+      
+      - name: Configure rclone
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+      
+      - name: Upload screenshots to Google Drive 📤
+        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+        run: |
+          rclone copy ./screenshots gdrive:screenshots-easybook/${{ env.APP_NAME }}_${{ env.APP_VERSION }} --create-dirs
+
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
