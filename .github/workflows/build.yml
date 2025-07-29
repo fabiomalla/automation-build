@@ -264,6 +264,13 @@ jobs:
         run: |
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+      
+      - name: 🧪 Test Rclone Drive Access
+        run: |
+          TEST_FOLDER="screenshots-sibook/test-rclone-$(date +%s)"
+          echo "Provo a creare la cartella su Drive: $TEST_FOLDER"
+          rclone mkdir "gdrive:$TEST_FOLDER"
+          echo "✅ Rclone ha funzionato! Cartella test creata con successo."
 
       - name: Setup EAS
         uses: expo/expo-github-action@v8
