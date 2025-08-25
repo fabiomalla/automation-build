@@ -57,6 +57,14 @@ jobs:
         with:
           xcode-version: 16.4
 
+      - name: List available iOS Simulators
+        run: |
+          echo "📱 Available device types:"
+          xcrun simctl list devicetypes
+      
+          echo "📱 Available devices:"
+          xcrun simctl list devices available
+
       - name: Install dependencies
         run: npm install
 
