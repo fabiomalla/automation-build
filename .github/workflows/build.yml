@@ -27,6 +27,20 @@ jobs:
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
 
+      - name: Setup Ruby & Bundle
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+
+      - name: Create Gemfile and install gems
+        run: |
+          cat > Gemfile <<'EOF'
+          source "https://rubygems.org"
+          gem "fastlane", ">= 2.228.0"
+          EOF
+          bundle install --jobs 4 --retry 3
+
       # Step per settare le variabili d'ambiente basato su USE_LORENZO e gestire il file APPLE_P8
       - name: Set environment variables for iOS and handle APPLE_P8
         run: |
@@ -38,7 +52,6 @@ jobs:
           echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64 }}" >> $GITHUB_ENV
           echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
           echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
-
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -67,13 +80,7 @@ jobs:
           else
             echo "jq is already installed"
           fi
-
-      - name: Install Fastlane
-        run: |
-          echo 'export GEM_HOME=$HOME/.gem' >> $GITHUB_ENV
-          echo 'export PATH=$HOME/.gem/bin:$PATH' >> $GITHUB_ENV
-          gem install --user-install fastlane -NV
-
+          
       - name: Extract and transform app name from app.json
         id: extract-transform-name
         run: |
@@ -120,6 +127,24 @@ jobs:
           jq -n --arg key_id "${{ env.APPLE_KEY_ID }}" --arg issuer_id "${{ env.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
             '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
 
+      - name: Generate AppStore provisioning profile (App)
+        run: |
+          bundle exec fastlane sigh \
+            --api_key_path fastlane/api_key.json \
+            --team_id "${{ env.APPLE_TEAM_ID }}" \
+            --app_identifier "${{ env.BUNDLE_ID }}" \
+            --filename "provisioning_profile.mobileprovision" \
+            --skip_certificate_verification
+
+      - name: Generate AppStore provisioning profile (OneSignal Extension)
+        run: |
+          bundle exec fastlane sigh \
+            --api_key_path fastlane/api_key.json \
+            --team_id "${{ env.APPLE_TEAM_ID }}" \
+            --app_identifier "${{ env.EXTENSION_BUNDLE_ID }}" \
+            --filename "provisioning_profile_onesignal.mobileprovision" \
+            --skip_certificate_verification
+
       - name: Run Fastlane Create App
         env:
           AUTH_KEY_PATH: "fastlane/AuthKey.p8"
@@ -129,7 +154,7 @@ jobs:
           BUNDLE_ID: ${{ env.BUNDLE_ID }}
           EXTENSION_BUNDLE_ID: ${{ env.EXTENSION_BUNDLE_ID }}
           APP_NAME: ${{ env.APP_NAME }}
-        run: fastlane create_app
+        run: bundle exec fastlane create_app
 
       - name: Create credentials.json
         run: |
@@ -189,7 +214,7 @@ jobs:
           APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
           SKIP_SCREENSHOTS: ${{ env.FORCE_SCREENSHOTS == 'false' }}
-        run: fastlane upload_ipa_to_app_store
+        run: bundle exec fastlane upload_ipa_to_app_store
 
   build_android:
     runs-on: ubuntu-latest
@@ -245,14 +270,6 @@ jobs:
         with:
           eas-version: 12.6.2
           token: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Install Ruby and Fastlane
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ruby-full
-          echo 'export GEM_HOME=$HOME/.gem' >> $GITHUB_ENV
-          echo 'export PATH=$HOME/.gem/bin:$PATH' >> $GITHUB_ENV
-          gem install --user-install fastlane -NV
 
       # Step to set environment variables for Android based on lorenzo.txt
       - name: Set environment variables for Android
