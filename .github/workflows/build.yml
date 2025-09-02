@@ -41,6 +41,16 @@ jobs:
           EOF
           bundle install --jobs 4 --retry 3
 
+      - name: Make fastlane available on PATH (shim)
+        run: |
+          echo '#!/usr/bin/env bash' > ./fastlane-shim
+          echo 'exec bundle exec fastlane "$@"' >> ./fastlane-shim
+          chmod +x ./fastlane-shim
+          mv ./fastlane-shim ./fastlane
+          echo "$PWD" >> $GITHUB_PATH
+          which fastlane
+          fastlane --version
+
       - name: Version installed of Fastlane
         run: bundle exec fastlane --version && ruby -v
 
