@@ -51,9 +51,17 @@ jobs:
           which fastlane
           fastlane --version
 
-      - name: Version installed of Fastlane
-        run: bundle exec fastlane --version && ruby -v
-
+      - name: Make fastlane available on PATH (shim)
+        run: |
+          echo '#!/usr/bin/env bash' > ./fastlane
+          echo 'exec bundle exec fastlane "$@"' >> ./fastlane
+          chmod +x ./fastlane
+          echo "$PWD" >> $GITHUB_PATH
+          # visibile subito in questo step
+          export PATH="$PWD:$PATH"
+          which fastlane
+          fastlane --version
+      
       - name: Version installed of Fastlane
         run: |
           bundle exec fastlane --version
