@@ -33,13 +33,11 @@ jobs:
           ruby-version: '3.2'
           bundler-cache: true
 
-      - name: Create Gemfile and install gems (Fastlane from GitHub)
+      - name: Create Gemfile and install gems (Fastlane from fork @ commit)
         run: |
           cat > Gemfile <<'EOF'
           source "https://rubygems.org"
-          gem "fastlane", github: "fastlane/fastlane", branch: "feat/new-screenshot-sizes"
-          # oppure, più stabile:
-          # gem "fastlane", github: "fastlane/fastlane", ref: "1121bd3271d1136d7419e40772d46c22554aa84f"
+          gem "fastlane", github: "Jeff-Tian/fastlane", ref: "1121bd3271d1136d7419e40772d46c22554aa84f"
           EOF
           bundle install --jobs 4 --retry 3
 
