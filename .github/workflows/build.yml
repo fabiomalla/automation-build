@@ -40,25 +40,24 @@ jobs:
           gem "fastlane", github: "Jeff-Tian/fastlane", ref: "1121bd3271d1136d7419e40772d46c22554aa84f"
           EOF
           bundle install --jobs 4 --retry 3
-
-      - name: Make fastlane available on PATH (shim)
+      
+      - name: Make fastlane available on PATH (binstubs)
         run: |
-          echo '#!/usr/bin/env bash' > ./fastlane-shim
-          echo 'exec bundle exec fastlane "$@"' >> ./fastlane-shim
-          chmod +x ./fastlane-shim
-          mv ./fastlane-shim ./fastlane
-          echo "$PWD" >> $GITHUB_PATH
+          bundle binstubs fastlane --path vendor/bundle/bin
+          echo "$PWD/vendor/bundle/bin" >> $GITHUB_PATH
+          export PATH="$PWD/vendor/bundle/bin:$PATH"
           which fastlane
           fastlane --version
-
-      - name: Make fastlane available on PATH (shim)
+      
+      - name: Debug PATH before EAS
         run: |
-          echo '#!/usr/bin/env bash' > ./fastlane
-          echo 'exec bundle exec fastlane "$@"' >> ./fastlane
-          chmod +x ./fastlane
-          echo "$PWD" >> $GITHUB_PATH
-          # visibile subito in questo step
-          export PATH="$PWD:$PATH"
+          echo "PATH is: $PATH"
+          which fastlane || echo "fastlane not found"
+          fastlane --version || echo "cannot run fastlane"
+      
+      - name: Symlink fastlane globally
+        run: |
+          sudo ln -sf "$PWD/vendor/bundle/bin/fastlane" /usr/local/bin/fastlane
           which fastlane
           fastlane --version
       
