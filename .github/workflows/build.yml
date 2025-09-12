@@ -189,13 +189,22 @@ jobs:
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: npm run generate:ios:screenshots
 
+      - name: Verify Certificate
+        run: |
+          echo "${{ env.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
+          openssl pkcs12 -in certificate.p12 -passin pass:"${{ env.CERT_P12_PASSWORD }}" -nokeys -info
+          echo "Certificate verification completed"
+      
       - name: Build iOS
         env:
           EXPO_APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
           EXPO_APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
           EXPO_APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
           EXPO_APPLE_API_KEY_PATH: "fastlane/AuthKey.p8"
-        run: npm run build:ios
+        run: |
+          # Usa credentials.json per il build
+          npx eas build --platform ios --local --non-interactive --credentials-path ./credentials.json
+
 
       - name: Upload to App Store
         env:
