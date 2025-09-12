@@ -127,23 +127,11 @@ jobs:
           jq -n --arg key_id "${{ env.APPLE_KEY_ID }}" --arg issuer_id "${{ env.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
             '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
 
-      - name: Generate AppStore provisioning profile (App)
+      - name: Install Apple WWDR Certificate
         run: |
-          bundle exec fastlane sigh \
-            --api_key_path fastlane/api_key.json \
-            --team_id "${{ env.APPLE_TEAM_ID }}" \
-            --app_identifier "${{ env.BUNDLE_ID }}" \
-            --filename "provisioning_profile.mobileprovision" \
-            --skip_certificate_verification
-
-      - name: Generate AppStore provisioning profile (OneSignal Extension)
-        run: |
-          bundle exec fastlane sigh \
-            --api_key_path fastlane/api_key.json \
-            --team_id "${{ env.APPLE_TEAM_ID }}" \
-            --app_identifier "${{ env.EXTENSION_BUNDLE_ID }}" \
-            --filename "provisioning_profile_onesignal.mobileprovision" \
-            --skip_certificate_verification
+          curl -O https://developer.apple.com/certificationauthority/AppleWWDRCA.cer
+          security import AppleWWDRCA.cer -k build.keychain -T /usr/bin/codesign
+          rm AppleWWDRCA.cer
 
       - name: Run Fastlane Create App
         env:
