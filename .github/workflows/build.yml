@@ -27,6 +27,20 @@ jobs:
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
 
+      - name: Check OpenSSL version
+        run: |
+          echo "=== OpenSSL Version ==="
+          openssl version
+          echo ""
+          echo "=== OpenSSL Details ==="
+          openssl version -a
+          echo ""
+          echo "=== Security Version ==="
+          security --version
+          echo ""
+          echo "=== Ruby OpenSSL ==="
+          ruby -e "require 'openssl'; puts OpenSSL::OPENSSL_VERSION"
+
       - name: Setup Ruby & Bundle
         uses: ruby/setup-ruby@v1
         with:
