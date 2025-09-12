@@ -127,13 +127,59 @@ jobs:
           security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          # Aggiungi la keychain alla search list (fondamentale su macOS runner)
+          security list-keychains -s build.keychain login.keychain
 
-      - name: Decode and Create Certificate and Provisioning Profile
+      - name: Import Distribution Certificate (.p12)
         run: |
           echo "${{ env.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
-          security import certificate.p12 -P "${{ env.CERT_P12_PASSWORD }}" -A -T /usr/bin/codesign -T /usr/bin/security
+          security import certificate.p12 -k build.keychain -P "${{ env.CERT_P12_PASSWORD }}" -T /usr/bin/codesign -T /usr/bin/security
+          # Consenti a Xcode/fastlane di accedere alla private key
           security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+
+      - name: Verify code signing identities
+        run: |
+          security find-identity -v -p codesigning || true
+
+      # 👇 NUOVO: scarica/crea i provisioning profile con sigh per App e NSE
+      - name: Download AppStore provisioning profiles with sigh (App + NSE)
+        env:
+          APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
+          APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
+        run: |
+          # Assicurati che fastlane usi l’API Key (hai già creato fastlane/api_key.json, bene)
+          echo "Using Fastlane API key at fastlane/api_key.json"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+
+          # App principale
+          bundle exec fastlane sigh \
+            --app_identifier "${{ env.BUNDLE_ID }}" \
+            --api_key_path fastlane/api_key.json \
+            --filename "provisioning_profile.mobileprovision" \
+            --output_path "." \
+            --skip_certificate_verification false \
+            --force \
+            --platform ios \
+            --adhoc false
+
+          # NSE OneSignal
+          bundle exec fastlane sigh \
+            --app_identifier "${{ env.EXTENSION_BUNDLE_ID }}" \
+            --api_key_path fastlane/api_key.json \
+            --filename "provisioning_profile_onesignal.mobileprovision" \
+            --output_path "." \
+            --skip_certificate_verification false \
+            --force \
+            --platform ios \
+            --adhoc false
+
+          # Copia anche nella cartella standard di Xcode (non strettamente necessario ma utile per debug)
+          cp provisioning_profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+          cp provisioning_profile_onesignal.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: List installed provisioning profiles (debug)
+        run: ls -lah ~/Library/MobileDevice/Provisioning\ Profiles || true
 
       - name: Determine if screenshots should be forced
         run: |
