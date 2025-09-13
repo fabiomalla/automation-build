@@ -359,6 +359,14 @@ jobs:
           bundle exec fastlane create_app
           echo "=== ✅ FINE FASTLANE CREATE APP ==="
 
+      - name: Build iOS
+        env:
+          EXPO_APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
+          EXPO_APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
+          EXPO_APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
+          EXPO_APPLE_API_KEY_PATH: "fastlane/AuthKey.p8"
+        run: npm run build:ios
+
       - name: Post-Build Debug
         run: |
           echo "=== 🔍 POST-BUILD DEBUG ==="
