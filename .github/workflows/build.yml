@@ -19,7 +19,7 @@ jobs:
   build_ios:
     runs-on: macos-latest
 
-    steps:          
+    steps:
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
         with:
@@ -32,7 +32,7 @@ jobs:
         with:
           ruby-version: '3.2'
           bundler-cache: true
-      
+
       - name: Create Gemfile and install gems
         run: |
           cat > Gemfile <<'EOF'
@@ -40,7 +40,7 @@ jobs:
           gem "fastlane", ">= 2.228.0"
           EOF
           bundle install --jobs 4 --retry 3
-      
+
       - name: Make fastlane available on PATH (binstubs)
         run: |
           bundle binstubs fastlane --path vendor/bundle/bin
@@ -48,29 +48,28 @@ jobs:
           export PATH="$PWD/vendor/bundle/bin:$PATH"
           which fastlane
           fastlane --version
-      
+
       - name: Debug PATH before EAS
         run: |
           echo "PATH is: $PATH"
           which fastlane || echo "fastlane not found"
           fastlane --version || echo "cannot run fastlane"
-      
+
       - name: Symlink fastlane globally
         run: |
           sudo ln -sf "$PWD/vendor/bundle/bin/fastlane" /usr/local/bin/fastlane
           which fastlane
           fastlane --version
-      
+
       - name: Version installed of Fastlane
         run: |
           bundle exec fastlane --version
           ruby -v
           bundle show fastlane
 
-      # Step per settare le variabili d'ambiente basato su USE_LORENZO e gestire il file APPLE_P8
+      # Variabili ambiente (API key e certificato solo per diagnosi)
       - name: Set environment variables for iOS and handle APPLE_P8
         run: |
-          echo "Setting default environment variables"
           echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
           echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
           echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
@@ -106,7 +105,7 @@ jobs:
           else
             echo "jq is already installed"
           fi
-          
+
       - name: Extract and transform app name from app.json
         id: extract-transform-name
         run: |
@@ -130,60 +129,37 @@ jobs:
             echo "FORCE_SCREENSHOTS=false" >> $GITHUB_ENV
           fi
 
-      - name: Create Keychain
-        run: |
-          echo "=== 🔐 CREAZIONE KEYCHAIN ==="
-          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
-          echo "✅ Keychain creato e configurato"
-
-      - name: Install Apple WWDR Certificate
-        run: |
-          echo "=== 📜 INSTALLAZIONE APPLE WWDR CERTIFICATE ==="
-          curl -O https://developer.apple.com/certificationauthority/AppleWWDRCA.cer
-          security import AppleWWDRCA.cer -k build.keychain -T /usr/bin/codesign -T /usr/bin/security
-          rm AppleWWDRCA.cer
-          echo "✅ Apple WWDR Certificate installato"
-
-      - name: Decode and Create Certificate and Provisioning Profile
-        run: |
-          echo "=== 🔑 DECODIFICA E INSTALLAZIONE CERTIFICATO ==="
-          echo "${{ env.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
-          security import certificate.p12 -P "${{ env.CERT_P12_PASSWORD }}" -A -T /usr/bin/codesign -T /usr/bin/security
-          security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-          echo "✅ Certificato installato nel keychain"
+      # ⚠️ NON SERVE creare/importare keychain/certificati WWDR per EAS
+      # Se vuoi usare Fastlane in locale per firmare .ipa, allora sì; qui EAS firma da sé.
 
       - name: Configure Fastlane API Key
         run: |
-          echo "=== 🔧 CONFIGURAZIONE FASTLANE API KEY ==="
-          if [[ "$USE_LORENZO" == "true" ]]; then
-            echo "Using Lorenzo Apple P8"
-            echo "${{ secrets.LORENZO_APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
-          else
-            echo "Using standard Apple P8"
-            echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
-          fi
-          
-          # Verifica che il file sia stato creato
-          if [ -f "fastlane/AuthKey.p8" ]; then
-            echo "✅ AuthKey.p8 creato correttamente"
-            ls -la fastlane/AuthKey.p8
-          else
-            echo "❌ AuthKey.p8 NON creato"
-            exit 1
-          fi
-          
-          # Crea api_key.json
+          mkdir -p fastlane
+          echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
           jq -n --arg key_id "${{ env.APPLE_KEY_ID }}" --arg issuer_id "${{ env.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
             '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
-          
-          echo "✅ api_key.json creato"
-          echo "=== Contenuto api_key.json ==="
-          cat fastlane/api_key.json
-          echo "=== ✅ FINE CONFIGURAZIONE FASTLANE ==="
+          echo "✅ Fastlane API key pronta"
 
+      # (Opzionale) Diagnosi P12: NON usata da EAS, solo per conferma che il tuo secret è giusto
+      - name: Validate iOS Distribution .p12 (optional diagnostics)
+        run: |
+          echo "=== 🔍 VALIDAZIONE CERTIFICATO .P12 (diagnostica) ==="
+          echo "${{ env.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
+          FP_RAW=$(openssl pkcs12 -in certificate.p12 -nokeys -passin pass:"${{ env.CERT_P12_PASSWORD }}" \
+            | openssl x509 -noout -fingerprint -sha1 | sed 's/SHA1 Fingerprint=//')
+          FP_NORM=$(echo "$FP_RAW" | tr -d ':' | tr '[:lower:]' '[:upper:]')
+          echo "P12 SHA1 Fingerprint (raw): $FP_RAW"
+          echo "P12 SHA1 Fingerprint (norm): $FP_NORM"
+          echo "→ Controllo presenza PRIVATE KEY"
+          if ! openssl pkcs12 -in certificate.p12 -nocerts -nodes -passin pass:"${{ env.CERT_P12_PASSWORD }}" | grep -q "BEGIN PRIVATE KEY"; then
+            echo "❌ Il P12 NON contiene la private key. Esporta di nuovo includendo la chiave privata."
+            exit 1
+          fi
+          echo "→ Date validità"
+          openssl pkcs12 -in certificate.p12 -clcerts -nokeys -passin pass:"${{ env.CERT_P12_PASSWORD }}" | openssl x509 -noout -dates
+          echo "✅ Diagnostica P12 completata"
+
+      # Fastlane create_app (se serve creare app/extension su ASC)
       - name: Run Fastlane Create App
         env:
           AUTH_KEY_PATH: "fastlane/AuthKey.p8"
@@ -195,61 +171,18 @@ jobs:
           APP_NAME: ${{ env.APP_NAME }}
         run: |
           echo "=== 🚀 FASTLANE CREATE APP ==="
-          echo "AUTH_KEY_PATH: $AUTH_KEY_PATH"
-          echo "APPLE_ID: $APPLE_ID"
-          echo "APPLE_KEY_ID: $APPLE_KEY_ID"
-          echo "APPLE_ISSUER_ID: $APPLE_ISSUER_ID"
-          echo "BUNDLE_ID: $BUNDLE_ID"
-          echo "EXTENSION_BUNDLE_ID: $EXTENSION_BUNDLE_ID"
-          echo "APP_NAME: $APP_NAME"
-          echo ""
           bundle exec fastlane create_app
           echo "=== ✅ FINE FASTLANE CREATE APP ==="
-
-      - name: Create credentials.json
-        run: |
-          echo "=== 📄 CREAZIONE CREDENTIALS.JSON ==="
-          echo '{
-            "ios": {
-              "'$BUNDLE_TARGET'": {
-                "distributionCertificate": {
-                  "path": "./certificate.p12",
-                  "password": "'${{ env.CERT_P12_PASSWORD }}'"
-                },
-                "provisioningProfilePath": "./provisioning_profile.mobileprovision"
-              },
-              "OneSignalNotificationServiceExtension": {
-                "distributionCertificate": {
-                  "path": "./certificate.p12",
-                  "password": "'${{ env.CERT_P12_PASSWORD }}'"
-                },
-                "provisioningProfilePath": "./provisioning_profile_onesignal.mobileprovision"
-              }
-            }
-          }' > ./credentials.json
-          
-          # Debug: mostra il contenuto del credentials.json
-          echo "=== Contenuto credentials.json ==="
-          cat ./credentials.json
-          echo "=== BUNDLE_TARGET utilizzato: $BUNDLE_TARGET ==="
-          echo "=== ✅ FINE CREAZIONE CREDENTIALS.JSON ==="
 
       - name: Debug EAS Configuration
         run: |
           echo "=== 🔍 DEBUG EAS CONFIGURATION ==="
-          echo "=== Contenuto eas.json ==="
           cat eas.json
           echo ""
-          echo "=== Contenuto app.json ==="
           cat app.json
           echo ""
-          echo "=== Verifica EAS CLI ==="
           eas --version
-          echo ""
-          echo "=== Verifica autenticazione EAS ==="
           eas whoami
-          echo ""
-          echo "=== Verifica progetto EAS ==="
           eas project:info
           echo "=== ✅ FINE DEBUG EAS CONFIGURATION ==="
 
@@ -271,121 +204,30 @@ jobs:
       - name: Install Apple Sim utils to take screenshots
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
-          echo "=== 📱 INSTALL APPLE SIM UTILS ==="
           brew tap wix/brew
           brew install applesimutils
-          echo "=== ✅ FINE INSTALL APPLE SIM UTILS ==="
 
       - name: Detox rebuild framework cache
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
-          echo "=== 🔄 DETOX REBUILD FRAMEWORK CACHE ==="
           yarn detox rebuild-framework-cache
-          echo "=== ✅ FINE DETOX REBUILD FRAMEWORK CACHE ==="
 
       - name: Create detox build to take screenshots
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
-          echo "=== 📱 CREATE DETOX BUILD ==="
           npm run build:ios:test
-          echo "=== ✅ FINE CREATE DETOX BUILD ==="
 
       - name: Decompress detox build artifact
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
-          echo "=== 📦 DECOMPRESS DETOX BUILD ARTIFACT ==="
           tar -xzvf build-*.tar.gz -C ./
-          echo "=== ✅ FINE DECOMPRESS DETOX BUILD ARTIFACT ==="
 
       - name: Take app screenshots
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
-          echo "=== 📸 TAKE APP SCREENSHOTS ==="
           npm run generate:ios:screenshots
-          echo "=== ✅ FINE TAKE APP SCREENSHOTS ==="
 
-      - name: Pre-Build Debug
-        run: |
-          echo "=== 🔍 PRE-BUILD DEBUG ==="
-          echo "=== Verifica file necessari ==="
-          ls -la fastlane/AuthKey.p8 || echo "❌ AuthKey.p8 non trovato"
-          ls -la fastlane/api_key.json || echo "❌ api_key.json non trovato"
-          ls -la certificate.p12 || echo "❌ certificate.p12 non trovato"
-          ls -la provisioning_profile.mobileprovision || echo "❌ provisioning_profile.mobileprovision non trovato"
-          ls -la provisioning_profile_onesignal.mobileprovision || echo "❌ provisioning_profile_onesignal.mobileprovision non trovato"
-          ls -la credentials.json || echo "❌ credentials.json non trovato"
-          echo ""
-          echo "=== Verifica keychain ==="
-          security find-identity -v -p codesigning build.keychain
-          echo ""
-          echo "=== Verifica progetto ==="
-          eas project:info
-          echo "=== ✅ FINE PRE-BUILD DEBUG ==="
-
-      - name: Run Fastlane Create App
-        env:
-          AUTH_KEY_PATH: "fastlane/AuthKey.p8"
-          APPLE_ID: ${{ env.APPLE_ID }}
-          APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
-          APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
-          BUNDLE_ID: ${{ env.BUNDLE_ID }}
-          EXTENSION_BUNDLE_ID: ${{ env.EXTENSION_BUNDLE_ID }}
-          APP_NAME: ${{ env.APP_NAME }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-        run: |
-          echo "=== 🚀 FASTLANE CREATE APP ==="
-          echo "AUTH_KEY_PATH: $AUTH_KEY_PATH"
-          echo "APPLE_ID: $APPLE_ID"
-          echo "APPLE_KEY_ID: $APPLE_KEY_ID"
-          echo "APPLE_ISSUER_ID: $APPLE_ISSUER_ID"
-          echo "BUNDLE_ID: $BUNDLE_ID"
-          echo "EXTENSION_BUNDLE_ID: $EXTENSION_BUNDLE_ID"
-          echo "APP_NAME: $APP_NAME"
-          echo "KEYCHAIN_PASSWORD: [HIDDEN]"
-          echo ""
-          
-          # CRUCIAL: Imposta il keychain come default prima di eseguire Fastlane
-          echo "=== 🔐 CONFIGURAZIONE KEYCHAIN PER FASTLANE ==="
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
-          
-          # Verifica che il keychain sia configurato correttamente
-          echo "=== Verifica keychain ==="
-          security find-identity -v -p codesigning build.keychain
-          echo ""
-          
-          # Esegui Fastlane
-          bundle exec fastlane create_app
-          echo "=== ✅ FINE FASTLANE CREATE APP ==="
-
-      - name: Validate iOS Distribution .p12 (fingerprint, private key, expiry)
-        run: |
-          echo "=== 🔍 VALIDAZIONE CERTIFICATO .P12 ==="
-          echo "${{ env.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
-      
-          echo "→ Calcolo fingerprint SHA1 dal .p12"
-          FP=$(openssl pkcs12 -in certificate.p12 -nokeys -passin pass:"${{ env.CERT_P12_PASSWORD }}" \
-            | openssl x509 -noout -fingerprint -sha1 | sed 's/SHA1 Fingerprint=//')
-          echo "P12 SHA1 Fingerprint: $FP"
-      
-          if [ "$FP" != "11751FFF0B469FC97CE0106793C60B9359824502" ]; then
-            echo "❌ Fingerprint diverso dal previsto. Hai caricato il p12 giusto nel secret CERT_P12_BASE64?"
-            exit 1
-          fi
-      
-          echo "→ Controllo presenza PRIVATE KEY"
-          if ! openssl pkcs12 -in certificate.p12 -nocerts -nodes -passin pass:"${{ env.CERT_P12_PASSWORD }}" | grep -q "BEGIN PRIVATE KEY"; then
-            echo "❌ Il P12 NON contiene la private key. Esporta di nuovo da macOS Keychain includendo la chiave privata."
-            exit 1
-          fi
-      
-          echo "→ Lettura date di validità"
-          openssl pkcs12 -in certificate.p12 -clcerts -nokeys -passin pass:"${{ env.CERT_P12_PASSWORD }}" \
-            | openssl x509 -noout -dates
-      
-          echo "✅ Validazione base completata"
-
+      # Build iOS con EAS → userà credenziali gestite (nessun credentials.json)
       - name: Build iOS
         env:
           EXPO_APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
@@ -397,11 +239,8 @@ jobs:
       - name: Post-Build Debug
         run: |
           echo "=== 🔍 POST-BUILD DEBUG ==="
-          echo "=== Verifica file generati ==="
-          ls -la *.ipa || echo "❌ Nessun file IPA trovato"
+          ls -la *.ipa || echo "❌ Nessun file IPA trovato (ok se EAS carica su Expo)."
           ls -la *.tar.gz || echo "❌ Nessun file tar.gz trovato"
-          echo ""
-          echo "=== Verifica log EAS ==="
           ls -la ~/.expo/ || echo "❌ Cartella .expo non trovata"
           echo "=== ✅ FINE POST-BUILD DEBUG ==="
 
@@ -413,11 +252,6 @@ jobs:
           SKIP_SCREENSHOTS: ${{ env.FORCE_SCREENSHOTS == 'false' }}
         run: |
           echo "=== 📤 UPLOAD TO APP STORE ==="
-          echo "AUTH_KEY_PATH: $AUTH_KEY_PATH"
-          echo "APPLE_KEY_ID: $APPLE_KEY_ID"
-          echo "APPLE_ISSUER_ID: $APPLE_ISSUER_ID"
-          echo "SKIP_SCREENSHOTS: $SKIP_SCREENSHOTS"
-          echo ""
           bundle exec fastlane upload_ipa_to_app_store
           echo "=== ✅ FINE UPLOAD TO APP STORE ==="
 
