@@ -174,7 +174,7 @@ jobs:
         run: |
           echo '{
             "ios": {
-              "IGrimaldiESG": {
+              "'$BUNDLE_TARGET'": {
                 "distributionCertificate": {
                   "path": "./certificate.p12",
                   "password": "'${{ env.CERT_P12_PASSWORD }}'"
@@ -194,6 +194,7 @@ jobs:
           # Debug: mostra il contenuto del credentials.json
           echo "=== Contenuto credentials.json ==="
           cat ./credentials.json
+          echo "=== BUNDLE_TARGET utilizzato: $BUNDLE_TARGET ==="
 
       - name: Install Apple Sim utils to take screenshots
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
