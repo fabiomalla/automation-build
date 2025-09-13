@@ -225,6 +225,9 @@ jobs:
           EXPO_APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
           EXPO_APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
           EXPO_APPLE_API_KEY_PATH: "fastlane/AuthKey.p8"
+          # Forza EAS a usare il keychain esistente
+          KEYCHAIN_PATH: "build.keychain"
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
           # Verifica che il credentials.json esista
           if [ ! -f "./credentials.json" ]; then
