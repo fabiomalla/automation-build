@@ -174,22 +174,26 @@ jobs:
         run: |
           echo '{
             "ios": {
+              "IGrimaldiESG": {
+                "distributionCertificate": {
+                  "path": "./certificate.p12",
+                  "password": "'${{ env.CERT_P12_PASSWORD }}'"
+                },
+                "provisioningProfilePath": "./provisioning_profile.mobileprovision"
+              },
               "OneSignalNotificationServiceExtension": {
                 "distributionCertificate": {
-                  "path": "certificate.p12",
+                  "path": "./certificate.p12",
                   "password": "'${{ env.CERT_P12_PASSWORD }}'"
                 },
-                "provisioningProfilePath": "provisioning_profile_onesignal.mobileprovision"
-              },
-              "'$BUNDLE_TARGET'": {
-                "distributionCertificate": {
-                  "path": "certificate.p12",
-                  "password": "'${{ env.CERT_P12_PASSWORD }}'"
-                },
-                "provisioningProfilePath": "provisioning_profile.mobileprovision"
+                "provisioningProfilePath": "./provisioning_profile_onesignal.mobileprovision"
               }
             }
           }' > ./credentials.json
+          
+          # Debug: mostra il contenuto del credentials.json
+          echo "=== Contenuto credentials.json ==="
+          cat ./credentials.json
 
       - name: Install Apple Sim utils to take screenshots
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
@@ -220,7 +224,15 @@ jobs:
           EXPO_APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
           EXPO_APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
           EXPO_APPLE_API_KEY_PATH: "fastlane/AuthKey.p8"
-        run: eas build -p ios --non-interactive
+        run: |
+          # Verifica che il credentials.json esista
+          if [ ! -f "./credentials.json" ]; then
+            echo "❌ credentials.json non trovato!"
+            exit 1
+          fi
+          
+          # Build con credenziali locali
+          eas build -p ios --non-interactive --local
 
       - name: Upload to App Store
         env:
