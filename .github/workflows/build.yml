@@ -359,6 +359,33 @@ jobs:
           bundle exec fastlane create_app
           echo "=== ✅ FINE FASTLANE CREATE APP ==="
 
+      - name: Validate iOS Distribution .p12 (fingerprint, private key, expiry)
+        run: |
+          echo "=== 🔍 VALIDAZIONE CERTIFICATO .P12 ==="
+          echo "${{ env.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
+      
+          echo "→ Calcolo fingerprint SHA1 dal .p12"
+          FP=$(openssl pkcs12 -in certificate.p12 -nokeys -passin pass:"${{ env.CERT_P12_PASSWORD }}" \
+            | openssl x509 -noout -fingerprint -sha1 | sed 's/SHA1 Fingerprint=//')
+          echo "P12 SHA1 Fingerprint: $FP"
+      
+          if [ "$FP" != "11751FFF0B469FC97CE0106793C60B9359824502" ]; then
+            echo "❌ Fingerprint diverso dal previsto. Hai caricato il p12 giusto nel secret CERT_P12_BASE64?"
+            exit 1
+          fi
+      
+          echo "→ Controllo presenza PRIVATE KEY"
+          if ! openssl pkcs12 -in certificate.p12 -nocerts -nodes -passin pass:"${{ env.CERT_P12_PASSWORD }}" | grep -q "BEGIN PRIVATE KEY"; then
+            echo "❌ Il P12 NON contiene la private key. Esporta di nuovo da macOS Keychain includendo la chiave privata."
+            exit 1
+          fi
+      
+          echo "→ Lettura date di validità"
+          openssl pkcs12 -in certificate.p12 -clcerts -nokeys -passin pass:"${{ env.CERT_P12_PASSWORD }}" \
+            | openssl x509 -noout -dates
+      
+          echo "✅ Validazione base completata"
+
       - name: Build iOS
         env:
           EXPO_APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
