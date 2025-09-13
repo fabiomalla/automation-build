@@ -322,73 +322,29 @@ jobs:
           eas project:info
           echo "=== ✅ FINE PRE-BUILD DEBUG ==="
 
-      - name: Build iOS
+      - name: Run Fastlane Create App
         env:
-          EXPO_APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
-          EXPO_APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
-          EXPO_APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
-          EXPO_APPLE_API_KEY_PATH: "fastlane/AuthKey.p8"
-          # Forza EAS a usare il keychain esistente
-          KEYCHAIN_PATH: "build.keychain"
+          AUTH_KEY_PATH: "fastlane/AuthKey.p8"
+          APPLE_ID: ${{ env.APPLE_ID }}
+          APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
+          APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
+          BUNDLE_ID: ${{ env.BUNDLE_ID }}
+          EXTENSION_BUNDLE_ID: ${{ env.EXTENSION_BUNDLE_ID }}
+          APP_NAME: ${{ env.APP_NAME }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-          # Debug
-          DEBUG: "1"
-          EXPO_DEBUG: "1"
-          EXPO_SKIP_DOCTOR: "true"
         run: |
-          echo "=== 🚀 INIZIO BUILD iOS ==="
-          echo "=== Variabili d'ambiente per il build ==="
-          echo "EXPO_APPLE_TEAM_ID: $EXPO_APPLE_TEAM_ID"
-          echo "EXPO_APPLE_KEY_ID: $EXPO_APPLE_KEY_ID"
-          echo "EXPO_APPLE_ISSUER_ID: $EXPO_APPLE_ISSUER_ID"
-          echo "EXPO_APPLE_API_KEY_PATH: $EXPO_APPLE_API_KEY_PATH"
-          echo "KEYCHAIN_PATH: $KEYCHAIN_PATH"
-          echo "DEBUG: $DEBUG"
-          echo "EXPO_DEBUG: $EXPO_DEBUG"
-          echo "EXPO_SKIP_DOCTOR: $EXPO_SKIP_DOCTOR"
+          echo "=== 🚀 FASTLANE CREATE APP ==="
+          echo "AUTH_KEY_PATH: $AUTH_KEY_PATH"
+          echo "APPLE_ID: $APPLE_ID"
+          echo "APPLE_KEY_ID: $APPLE_KEY_ID"
+          echo "APPLE_ISSUER_ID: $APPLE_ISSUER_ID"
+          echo "BUNDLE_ID: $BUNDLE_ID"
+          echo "EXTENSION_BUNDLE_ID: $EXTENSION_BUNDLE_ID"
+          echo "APP_NAME: $APP_NAME"
+          echo "KEYCHAIN_PASSWORD: [HIDDEN]"
           echo ""
-          
-          # Verifica file necessari
-          if [ -f "fastlane/AuthKey.p8" ]; then
-            echo "✅ AuthKey.p8 trovato"
-            ls -la fastlane/AuthKey.p8
-          else
-            echo "❌ AuthKey.p8 NON trovato"
-            exit 1
-          fi
-          
-          if [ -f "credentials.json" ]; then
-            echo "✅ credentials.json trovato"
-            cat credentials.json
-          else
-            echo "❌ credentials.json NON trovato"
-            exit 1
-          fi
-          
-          # Verifica che il keychain esista e sia configurato correttamente
-          echo "=== Verifica keychain ==="
-          security find-identity -v -p codesigning build.keychain
-          echo ""
-          
-          # Forza EAS a usare il nostro keychain invece di crearne uno nuovo
-          echo "=== Configurazione keychain per EAS ==="
-          # Imposta il keychain come default
-          security default-keychain -s build.keychain
-          # Sblocca il keychain
-          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-          # Verifica che sia configurato correttamente
-          security show-keychain-info build.keychain
-          echo ""
-          
-          # CRUCIAL: Imposta le variabili d'ambiente per forzare EAS a usare il nostro keychain
-          export KEYCHAIN_PATH="build.keychain"
-          export KEYCHAIN_PASSWORD="${{ secrets.KEYCHAIN_PASSWORD }}"
-          
-          echo "=== Esecuzione EAS build ==="
-          # Usa il flag --local per forzare l'uso delle credenziali locali
-          eas build -p ios --non-interactive --local
-          
-          echo "=== ✅ BUILD iOS COMPLETATO ==="
+          bundle exec fastlane create_app
+          echo "=== ✅ FINE FASTLANE CREATE APP ==="
 
       - name: Post-Build Debug
         run: |
