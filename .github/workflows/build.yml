@@ -228,6 +228,8 @@ jobs:
           # Forza EAS a usare il keychain esistente
           KEYCHAIN_PATH: "build.keychain"
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          # Salta expo doctor
+          EXPO_SKIP_DOCTOR: "true"
         run: |
           # Verifica che il credentials.json esista
           if [ ! -f "./credentials.json" ]; then
