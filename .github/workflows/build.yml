@@ -235,6 +235,18 @@ jobs:
             exit 1
           fi
           
+          # Debug finale prima del build
+          echo "=== Debug finale ==="
+          echo "BUNDLE_TARGET: $BUNDLE_TARGET"
+          echo "BUNDLE_ID: $BUNDLE_ID"
+          echo "KEYCHAIN_PATH: $KEYCHAIN_PATH"
+          echo ""
+          echo "=== Contenuto credentials.json ==="
+          cat ./credentials.json
+          echo ""
+          echo "=== Verifica keychain ==="
+          security find-identity -v -p codesigning build.keychain
+          
           # Build con credenziali locali
           eas build -p ios --non-interactive --local
 
