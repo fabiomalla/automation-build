@@ -88,7 +88,7 @@ jobs:
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
-          eas-version: 14.4.0
+          eas-version: 16.19.1
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Select Xcode version
@@ -259,7 +259,7 @@ jobs:
           ls -la fastlane/api_key.json || echo "❌ api_key.json non trovato"
           echo ""
           echo "=== Verifica EAS credentials ==="
-          eas credentials -p ios --profile production --non-interactive || echo "❌ Errore verifica credentials"
+          eas credentials -p ios --non-interactive || echo "❌ Errore verifica credentials"
           echo ""
           echo "=== Verifica progetto ==="
           eas project:info
@@ -297,7 +297,7 @@ jobs:
           fi
           
           echo "=== Esecuzione EAS build ==="
-          eas build -p ios --non-interactive --local --verbose
+          eas build -p ios --non-interactive --local
           
           echo "=== ✅ BUILD iOS COMPLETATO ==="
 
