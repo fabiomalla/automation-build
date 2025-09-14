@@ -1,166 +1,166 @@
 name: ${{ github.event.inputs.branch || 'Build and Deploy' }}
 
 on:
-  workflow_dispatch:
-    inputs:
-      branch:
-        description: "Branch to build"
-        required: true
-      forceScreenshots:
-        description: "Force screenshots creation"
-        required: false
-        default: "false"
-        type: choice
-        options:
-          - "true"
-          - "false"
+workflow_dispatch:
+  inputs:
+    branch:
+      description: "Branch to build"
+      required: true
+    forceScreenshots:
+      description: "Force screenshots creation"
+      required: false
+      default: "false"
+      type: choice
+      options:
+        - "true"
+        - "false"
 
 jobs:
-  build_ios:
-    runs-on: macos-latest
+build_ios:
+  runs-on: macos-latest
 
-    steps:
-      - name: Checkout the Private Repository
-        uses: actions/checkout@v3
-        with:
-          repository: lorenzomalla/easybook-app-refactor
-          token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
-          ref: ${{ github.event.inputs.branch }}
+  steps:
+    - name: Checkout the Private Repository
+      uses: actions/checkout@v3
+      with:
+        repository: lorenzomalla/easybook-app-refactor
+        token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
+        ref: ${{ github.event.inputs.branch }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version-file: ".node-version"
-          cache: "npm"
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version-file: ".node-version"
+        cache: "npm"
 
-      - name: Setup EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: 16.19.1
-          token: ${{ secrets.EXPO_TOKEN }}
+    - name: Setup EAS
+      uses: expo/expo-github-action@v8
+      with:
+        eas-version: 16.19.1
+        token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Select Xcode version
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: 16.4
+    - name: Select Xcode version
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: 16.4
 
-      - name: Install dependencies
-        run: npm install
+    - name: Install dependencies
+      run: npm install
 
-      - name: Install jq
-        run: |
-          if ! command -v jq &> /dev/null; then
-            brew install jq
-          else
-            echo "jq is already installed"
-          fi
+    - name: Install jq
+      run: |
+        if ! command -v jq &> /dev/null; then
+          brew install jq
+        else
+          echo "jq is already installed"
+        fi
 
-      - name: Extract and transform app name from app.json
-        id: extract-transform-name
-        run: |
-          NAME=$(jq -r '.expo.name' app.json)
-          BUNDLE_TARGET=$(echo $NAME | tr -d " .'&-" )
-          BUNDLE_ID=$(jq -r '.expo.ios.bundleIdentifier' app.json)
-          EXTENSION_BUNDLE_ID="${BUNDLE_ID}.OneSignalNotificationServiceExtension"
-          APP_VERSION=$(jq -r '.expo.version' app.json)
-          APP_NAME=$(jq -r '.expo.name' app.json)
-          echo "BUNDLE_TARGET=$BUNDLE_TARGET" >> $GITHUB_ENV
-          echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
-          echo "EXTENSION_BUNDLE_ID=$EXTENSION_BUNDLE_ID" >> $GITHUB_ENV
-          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+    - name: Extract and transform app name from app.json
+      id: extract-transform-name
+      run: |
+        NAME=$(jq -r '.expo.name' app.json)
+        BUNDLE_TARGET=$(echo $NAME | tr -d " .'&-" )
+        BUNDLE_ID=$(jq -r '.expo.ios.bundleIdentifier' app.json)
+        EXTENSION_BUNDLE_ID="${BUNDLE_ID}.OneSignalNotificationServiceExtension"
+        APP_VERSION=$(jq -r '.expo.version' app.json)
+        APP_NAME=$(jq -r '.expo.name' app.json)
+        echo "BUNDLE_TARGET=$BUNDLE_TARGET" >> $GITHUB_ENV
+        echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
+        echo "EXTENSION_BUNDLE_ID=$EXTENSION_BUNDLE_ID" >> $GITHUB_ENV
+        echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+        echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
 
-      - name: Determine if screenshots should be forced
-        run: |
-          if [[ "${{ github.event.inputs.forceScreenshots }}" == "true" || "${{ env.APP_VERSION }}" == "1.0.0" ]]; then
-            echo "FORCE_SCREENSHOTS=true" >> $GITHUB_ENV
-          else
-            echo "FORCE_SCREENSHOTS=false" >> $GITHUB_ENV
-          fi
+    - name: Determine if screenshots should be forced
+      run: |
+        if [[ "${{ github.event.inputs.forceScreenshots }}" == "true" || "${{ env.APP_VERSION }}" == "1.0.0" ]]; then
+          echo "FORCE_SCREENSHOTS=true" >> $GITHUB_ENV
+        else
+          echo "FORCE_SCREENSHOTS=false" >> $GITHUB_ENV
+        fi
 
-      # DEBUG: stampa contesto e config
-      - name: Debug - Show CLI and project info
-        run: |
-          node -v
-          npm -v
-          eas --version
-          echo "Xcode: $(xcodebuild -version | tr '\n' ' | ')"
-          echo "Current dir: $PWD"
-          ls -la
-          echo "---- app.json (ios) ----"
-          jq '.expo.ios' app.json
-          echo "---- eas.json ----"
-          cat eas.json || true
-          echo "Production credentialsSource:"
-          node -e "try{console.log(require('./eas.json').build.production.ios.credentialsSource)}catch(e){console.log('no eas.json')}"
-          echo "EAS whoami:"
-          eas whoami || true
+    # DEBUG: stampa contesto e config
+    - name: Debug - Show CLI and project info
+      run: |
+        node -v
+        npm -v
+        eas --version
+        echo "Xcode: $(xcodebuild -version | tr '\n' ' | ')"
+        echo "Current dir: $PWD"
+        ls -la
+        echo "---- app.json (ios) ----"
+        jq '.expo.ios' app.json
+        echo "---- eas.json ----"
+        cat eas.json || true
+        echo "Production credentialsSource:"
+        node -e "try{console.log(require('./eas.json').build.production.ios.credentialsSource)}catch(e){console.log('no eas.json')}"
+        echo "EAS whoami:"
+        eas whoami || true
 
-      # Forza credenziali remote: rimuove qualsiasi file locale che innesca 'Using local iOS credentials (credentials.json)'
-      - name: Force remote EAS credentials
-        run: |
-          rm -f credentials.json provisioning_profile*.mobileprovision
-          echo "credentials.json exists?"; if [ -f credentials.json ]; then echo "YES"; else echo "NO"; fi
-          echo "Any provisioning_profile*.mobileprovision left?"
-          ls -1 provisioning_profile*.mobileprovision 2>/dev/null || echo "none"
+    # Forza credenziali remote: rimuove qualsiasi file locale che innesca 'Using local iOS credentials (credentials.json)'
+    - name: Force remote EAS credentials
+      run: |
+        rm -f credentials.json provisioning_profile*.mobileprovision
+        echo "credentials.json exists?"; if [ -f credentials.json ]; then echo "YES"; else echo "NO"; fi
+        echo "Any provisioning_profile*.mobileprovision left?"
+        ls -1 provisioning_profile*.mobileprovision 2>/dev/null || echo "none"
 
-      # Configura variabili Apple API key per EAS (usate per build/submit)
-      - name: Set Apple API Key env for EAS
-        run: |
-          echo "EXPO_APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
-          echo "EXPO_APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
-          echo "EXPO_APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
-          # Salva la P8 su file e passala a EAS
-          mkdir -p fastlane
-          echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
-          echo "EXPO_APPLE_API_KEY_PATH=fastlane/AuthKey.p8" >> $GITHUB_ENV
-          echo "Set EXPO_* env done."
+    # Configura variabili Apple API key per EAS (usate per build/submit)
+    - name: Set Apple API Key env for EAS
+      run: |
+        echo "EXPO_APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+        echo "EXPO_APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
+        echo "EXPO_APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
+        # Salva la P8 su file e passala a EAS
+        mkdir -p fastlane
+        echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
+        echo "EXPO_APPLE_API_KEY_PATH=fastlane/AuthKey.p8" >> $GITHUB_ENV
+        echo "Set EXPO_* env done."
 
-      # Screenshot opzionali (profilo preview iOS è simulator=true, non serve signing)
-      - name: Install Apple Sim utils to take screenshots
-        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
-        run: |
-          brew tap wix/brew
-          brew install applesimutils
+    # Screenshot opzionali (profilo preview iOS è simulator=true, non serve signing)
+    - name: Install Apple Sim utils to take screenshots
+      if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+      run: |
+        brew tap wix/brew
+        brew install applesimutils
 
-      - name: Detox rebuild framework cache
-        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
-        run: yarn detox rebuild-framework-cache
+    - name: Detox rebuild framework cache
+      if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+      run: yarn detox rebuild-framework-cache
 
-      - name: Create detox build to take screenshots
-        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
-        run: npm run build:ios:test
+    - name: Create detox build to take screenshots
+      if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+      run: npm run build:ios:test
 
-      - name: Decompress detox build artifact
-        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
-        run: |
-          tar -xzvf build-*.tar.gz -C ./
+    - name: Decompress detox build artifact
+      if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+      run: |
+        tar -xzvf build-*.tar.gz -C ./
 
-      - name: Take app screenshots
-        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
-        run: npm run generate:ios:screenshots
+    - name: Take app screenshots
+      if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+      run: npm run generate:ios:screenshots
 
-      # Build iOS REMOTO (usa credenziali remote EAS)
-      - name: Build iOS (remote)
-        env:
-          EXPO_APPLE_TEAM_ID: ${{ env.EXPO_APPLE_TEAM_ID }}
-          EXPO_APPLE_KEY_ID: ${{ env.EXPO_APPLE_KEY_ID }}
-          EXPO_APPLE_ISSUER_ID: ${{ env.EXPO_APPLE_ISSUER_ID }}
-          EXPO_APPLE_API_KEY_PATH: ${{ env.EXPO_APPLE_API_KEY_PATH }}
-        run: |
-          echo "Starting EAS iOS build with remote credentials (production profile)"
-          eas build -p ios --profile production --non-interactive
+    # Build iOS REMOTO (usa credenziali remote EAS)
+    - name: Build iOS (remote)
+      env:
+        EXPO_APPLE_TEAM_ID: ${{ env.EXPO_APPLE_TEAM_ID }}
+        EXPO_APPLE_KEY_ID: ${{ env.EXPO_APPLE_KEY_ID }}
+        EXPO_APPLE_ISSUER_ID: ${{ env.EXPO_APPLE_ISSUER_ID }}
+        EXPO_APPLE_API_KEY_PATH: ${{ env.EXPO_APPLE_API_KEY_PATH }}
+      run: |
+        echo "Starting EAS iOS build with remote credentials (production profile)"
+        eas build -p ios --profile production --non-interactive
 
-      # Submit all'App Store con EAS Submit (evita gestione IPA manuale)
-      - name: Submit to App Store
-        env:
-          EXPO_APPLE_TEAM_ID: ${{ env.EXPO_APPLE_TEAM_ID }}
-          EXPO_APPLE_KEY_ID: ${{ env.EXPO_APPLE_KEY_ID }}
-          EXPO_APPLE_ISSUER_ID: ${{ env.EXPO_APPLE_ISSUER_ID }}
-          EXPO_APPLE_API_KEY_PATH: ${{ env.EXPO_APPLE_API_KEY_PATH }}
-        run: |
-          echo "Submitting latest build to App Store with EAS Submit"
-          eas submit -p ios --latest --non-interactive
+    # Submit all'App Store con EAS Submit (evita gestione IPA manuale)
+    - name: Submit to App Store
+      env:
+        EXPO_APPLE_TEAM_ID: ${{ env.EXPO_APPLE_TEAM_ID }}
+        EXPO_APPLE_KEY_ID: ${{ env.EXPO_APPLE_KEY_ID }}
+        EXPO_APPLE_ISSUER_ID: ${{ env.EXPO_APPLE_ISSUER_ID }}
+        EXPO_APPLE_API_KEY_PATH: ${{ env.EXPO_APPLE_API_KEY_PATH }}
+      run: |
+        echo "Submitting latest build to App Store with EAS Submit"
+        eas submit -p ios --latest --non-interactive
 
   build_android:
     runs-on: ubuntu-latest
