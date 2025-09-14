@@ -120,12 +120,6 @@ jobs:
           CONTENT="$( (openssl pkcs12 -in certificate.p12 -legacy -passin pass:"${{ env.CERT_P12_PASSWORD }}" -nocerts -nodes || \
                        openssl pkcs12 -in certificate.p12          -passin pass:"${{ env.CERT_P12_PASSWORD }}" -nocerts -nodes) 2>/dev/null )"
           echo "$CONTENT" | grep -q "PRIVATE KEY" && echo "OK PRIVATE KEY" || (echo "NO PRIVATE KEY"; exit 1)
-
-      - name: Debug P12 (optional)
-        run: |
-          (openssl pkcs12 -in certificate.p12 -legacy -passin pass:"${{ env.CERT_P12_PASSWORD }}" -nokeys -clcerts || \
-           openssl pkcs12 -in certificate.p12          -passin pass:"${{ env.CERT_P12_PASSWORD }}" -nokeys -clcerts) \
-           | openssl x509 -noout -subject -issuer -dates || echo "OpenSSL failed"
       
       - name: Import P12 into build.keychain and list identities
         run: |
