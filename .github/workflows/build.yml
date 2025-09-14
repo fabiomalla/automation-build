@@ -159,6 +159,32 @@ jobs:
           cat fastlane/api_key.json
           echo "=== ✅ FINE CONFIGURAZIONE FASTLANE ==="
 
+      - name: Verify Certificates and Profiles
+        run: |
+          echo "=== 🔍 VERIFICA CERTIFICATI E PROFILI ==="
+          
+          # Verifica certificati nel keychain di sistema
+          echo "=== Certificati nel keychain di sistema ==="
+          security find-identity -v -p codesigning login.keychain
+          echo ""
+          
+          # Verifica certificati nel nostro keychain
+          echo "=== Certificati nel nostro keychain ==="
+          security find-identity -v -p codesigning build.keychain
+          echo ""
+          
+          # Verifica provisioning profiles
+          echo "=== Provisioning profiles ==="
+          ls -la *.mobileprovision || echo "❌ Nessun provisioning profile trovato"
+          echo ""
+          
+          # Verifica certificato P12
+          echo "=== Certificato P12 ==="
+          ls -la certificate.p12 || echo "❌ Certificato P12 non trovato"
+          echo ""
+          
+          echo "=== ✅ FINE VERIFICA ==="
+
       - name: Run Fastlane Create App
         env:
           AUTH_KEY_PATH: "fastlane/AuthKey.p8"
@@ -168,8 +194,9 @@ jobs:
           BUNDLE_ID: ${{ env.BUNDLE_ID }}
           EXTENSION_BUNDLE_ID: ${{ env.EXTENSION_BUNDLE_ID }}
           APP_NAME: ${{ env.APP_NAME }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          echo "=== 🚀 FASTLANE CREATE APP ==="
+          echo "=== 🚀 FASTLANE CREATE APP (PROVISIONING PROFILES) ==="
           echo "AUTH_KEY_PATH: $AUTH_KEY_PATH"
           echo "APPLE_ID: $APPLE_ID"
           echo "APPLE_KEY_ID: $APPLE_KEY_ID"
@@ -177,7 +204,15 @@ jobs:
           echo "BUNDLE_ID: $BUNDLE_ID"
           echo "EXTENSION_BUNDLE_ID: $EXTENSION_BUNDLE_ID"
           echo "APP_NAME: $APP_NAME"
+          echo "KEYCHAIN_PASSWORD: [HIDDEN]"
           echo ""
+          
+          # Verifica che i certificati siano disponibili
+          echo "=== Verifica certificati disponibili ==="
+          security find-identity -v -p codesigning login.keychain
+          echo ""
+          
+          # Esegui Fastlane per creare i provisioning profiles
           bundle exec fastlane create_app
           echo "=== ✅ FINE FASTLANE CREATE APP ==="
 
