@@ -145,14 +145,6 @@ jobs:
           security import certificate.p12 -P "${{ env.CERT_P12_PASSWORD }}" -A -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
 
-      - name: Debug P12 and keychain identities
-        run: |
-          echo "P12 size: $(stat -f%z certificate.p12 || echo 'missing')"
-          openssl pkcs12 -in certificate.p12 -passin pass:"${{ env.CERT_P12_PASSWORD }}" -nokeys -clcerts \
-            | openssl x509 -noout -subject -issuer -dates || echo "OpenSSL failed"
-          echo "Identities in build.keychain:"
-          security find-identity -v -p codesigning build.keychain | cat
-
       - name: Configure Fastlane API Key
         run: |
           if [[ "$USE_LORENZO" == "true" ]]; then
