@@ -1,4 +1,4 @@
-run-name: ${{ github.event.inputs.branch || 'Build and Deploy' }}
+name: ${{ github.event.inputs.branch || 'Build and Deploy' }}
 
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ jobs:
   build_ios:
     runs-on: macos-latest
 
-    steps:          
+    steps:
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
         with:
@@ -27,56 +27,6 @@ jobs:
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
 
-      - name: Setup Ruby & Bundle
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-          bundler-cache: true
-
-      - name: Create Gemfile and install gems (Fastlane from fork @ commit)
-        run: |
-          cat > Gemfile <<'EOF'
-          source "https://rubygems.org"
-          gem "fastlane", github: "Jeff-Tian/fastlane", ref: "1121bd3271d1136d7419e40772d46c22554aa84f"
-          EOF
-          bundle install --jobs 4 --retry 3
-      
-      - name: Make fastlane available on PATH (binstubs)
-        run: |
-          bundle binstubs fastlane --path vendor/bundle/bin
-          echo "$PWD/vendor/bundle/bin" >> $GITHUB_PATH
-          export PATH="$PWD/vendor/bundle/bin:$PATH"
-          which fastlane
-          fastlane --version
-      
-      - name: Debug PATH before EAS
-        run: |
-          echo "PATH is: $PATH"
-          which fastlane || echo "fastlane not found"
-          fastlane --version || echo "cannot run fastlane"
-      
-      - name: Symlink fastlane globally
-        run: |
-          sudo ln -sf "$PWD/vendor/bundle/bin/fastlane" /usr/local/bin/fastlane
-          which fastlane
-          fastlane --version
-      
-      - name: Version installed of Fastlane
-        run: |
-          bundle exec fastlane --version
-          ruby -v
-          bundle show fastlane
-      # Step per settare le variabili d'ambiente basato su USE_LORENZO e gestire il file APPLE_P8
-      - name: Set environment variables for iOS and handle APPLE_P8
-        run: |
-          echo "Setting default environment variables"
-          echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
-          echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
-          echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
-          echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
-          echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64 }}" >> $GITHUB_ENV
-          echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
-          echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
@@ -86,7 +36,7 @@ jobs:
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
-          eas-version: 14.4.0
+          eas-version: 16.19.1
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Select Xcode version
@@ -104,7 +54,7 @@ jobs:
           else
             echo "jq is already installed"
           fi
-          
+
       - name: Extract and transform app name from app.json
         id: extract-transform-name
         run: |
@@ -119,6 +69,7 @@ jobs:
           echo "EXTENSION_BUNDLE_ID=$EXTENSION_BUNDLE_ID" >> $GITHUB_ENV
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+
       - name: Determine if screenshots should be forced
         run: |
           if [[ "${{ github.event.inputs.forceScreenshots }}" == "true" || "${{ env.APP_VERSION }}" == "1.0.0" ]]; then
@@ -126,60 +77,52 @@ jobs:
           else
             echo "FORCE_SCREENSHOTS=false" >> $GITHUB_ENV
           fi
-      - name: Create Keychain
-        run: |
-          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
-      - name: Decode and Create Certificate and Provisioning Profile
-        run: |
-          echo "${{ env.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
-          security import certificate.p12 -P "${{ env.CERT_P12_PASSWORD }}" -A -T /usr/bin/codesign -T /usr/bin/security
-          security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-      - name: Configure Fastlane API Key
-        run: |
-          echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
-          jq -n --arg key_id "${{ env.APPLE_KEY_ID }}" --arg issuer_id "${{ env.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
-            '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
-      - name: Run Fastlane Create App
-        env:
-          AUTH_KEY_PATH: "fastlane/AuthKey.p8"
-          APPLE_ID: ${{ env.APPLE_ID }}
-          APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
-          APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
-          BUNDLE_ID: ${{ env.BUNDLE_ID }}
-          EXTENSION_BUNDLE_ID: ${{ env.EXTENSION_BUNDLE_ID }}
-          APP_NAME: ${{ env.APP_NAME }}
-          CI: "true"  # AGGIUNGI QUESTA LINEA
-          GITHUB_ACTIONS: "true"  # AGGIUNGI QUESTA LINEA
-        run: bundle exec fastlane create_app
 
-      - name: Create credentials.json
+      # DEBUG: stampa contesto e config
+      - name: Debug - Show CLI and project info
         run: |
-          echo '{
-            "ios": {
-              "OneSignalNotificationServiceExtension": {
-                "distributionCertificate": {
-                  "path": "certificate.p12",
-                  "password": "'${{ env.CERT_P12_PASSWORD }}'"
-                },
-                "provisioningProfilePath": "provisioning_profile_onesignal.mobileprovision"
-              },
-              "'$BUNDLE_TARGET'": {
-                "distributionCertificate": {
-                  "path": "certificate.p12",
-                  "password": "'${{ env.CERT_P12_PASSWORD }}'"
-                },
-                "provisioningProfilePath": "provisioning_profile.mobileprovision"
-              }
-            }
-          }' > ./credentials.json
+          node -v
+          npm -v
+          eas --version
+          echo "Xcode: $(xcodebuild -version | tr '\n' ' | ')"
+          echo "Current dir: $PWD"
+          ls -la
+          echo "---- app.json (ios) ----"
+          jq '.expo.ios' app.json
+          echo "---- eas.json ----"
+          cat eas.json || true
+          echo "Production credentialsSource:"
+          node -e "try{console.log(require('./eas.json').build.production.ios.credentialsSource)}catch(e){console.log('no eas.json')}"
+          echo "EAS whoami:"
+          eas whoami || true
+
+      # Forza credenziali remote: rimuove qualsiasi file locale che innesca 'Using local iOS credentials (credentials.json)'
+      - name: Force remote EAS credentials
+        run: |
+          rm -f credentials.json provisioning_profile*.mobileprovision
+          echo "credentials.json exists?"; if [ -f credentials.json ]; then echo "YES"; else echo "NO"; fi
+          echo "Any provisioning_profile*.mobileprovision left?"
+          ls -1 provisioning_profile*.mobileprovision 2>/dev/null || echo "none"
+
+      # Configura variabili Apple API key per EAS (usate per build/submit)
+      - name: Set Apple API Key env for EAS
+        run: |
+          echo "EXPO_APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+          echo "EXPO_APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
+          echo "EXPO_APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
+          # Salva la P8 su file e passala a EAS
+          mkdir -p fastlane
+          echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
+          echo "EXPO_APPLE_API_KEY_PATH=fastlane/AuthKey.p8" >> $GITHUB_ENV
+          echo "Set EXPO_* env done."
+
+      # Screenshot opzionali (profilo preview iOS è simulator=true, non serve signing)
       - name: Install Apple Sim utils to take screenshots
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
           brew tap wix/brew
           brew install applesimutils
+
       - name: Detox rebuild framework cache
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: yarn detox rebuild-framework-cache
@@ -192,25 +135,201 @@ jobs:
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
           tar -xzvf build-*.tar.gz -C ./
+
       - name: Take app screenshots
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: npm run generate:ios:screenshots
 
-      - name: Build iOS
+      # Build iOS REMOTO (usa credenziali remote EAS)
+      - name: Build iOS (remote)
         env:
-          EXPO_APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
-          EXPO_APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
-          EXPO_APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
-          EXPO_APPLE_API_KEY_PATH: "fastlane/AuthKey.p8"
-        run: eas build -p ios --profile production --non-interactive
+          EXPO_APPLE_TEAM_ID: ${{ env.EXPO_APPLE_TEAM_ID }}
+          EXPO_APPLE_KEY_ID: ${{ env.EXPO_APPLE_KEY_ID }}
+          EXPO_APPLE_ISSUER_ID: ${{ env.EXPO_APPLE_ISSUER_ID }}
+          EXPO_APPLE_API_KEY_PATH: ${{ env.EXPO_APPLE_API_KEY_PATH }}
+        run: |
+          echo "Starting EAS iOS build with remote credentials (production profile)"
+          eas build -p ios --profile production --non-interactive
 
-      - name: Upload to App Store
+      # Submit all'App Store con EAS Submit (evita gestione IPA manuale)
+      - name: Submit to App Store
         env:
-          AUTH_KEY_PATH: "fastlane/AuthKey.p8"
-          APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
-          APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
+          EXPO_APPLE_TEAM_ID: ${{ env.EXPO_APPLE_TEAM_ID }}
+          EXPO_APPLE_KEY_ID: ${{ env.EXPO_APPLE_KEY_ID }}
+          EXPO_APPLE_ISSUER_ID: ${{ env.EXPO_APPLE_ISSUER_ID }}
+          EXPO_APPLE_API_KEY_PATH: ${{ env.EXPO_APPLE_API_KEY_PATH }}
+        run: |
+          echo "Submitting latest build to App Store with EAS Submit"
+          eas submit -p ios --latest --non-interactive
+
+  build_android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete unnecessary tools 🔧
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: false
+          tool-cache: true
+          dotnet: true
+          haskell: true
+          swap-storage: true
+          docker-images: false
+          large-packages: false
+
+      - name: Checkout the Private Repository
+        uses: actions/checkout@v3
+        with:
+          repository: lorenzomalla/easybook-app-refactor
+          token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: ".node-version"
+          cache: "npm"
+
+      - name: Install rclone
+        run: |
+          curl -O https://downloads.rclone.org/rclone-current-linux-amd64.zip
+          unzip rclone-current-linux-amd64.zip
+          cd rclone-*-linux-amd64
+          sudo cp rclone /usr/bin/rclone
+          sudo chmod 755 /usr/bin/rclone
+          rclone version
+
+      - name: Configure rclone (base64)
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG_BASE64 }}" | base64 --decode > ~/.config/rclone/rclone.conf
+
+      - name: 🧪 Test Rclone Drive Access
+        run: |
+          TEST_FOLDER="screenshots-sibook/test-rclone-$(date +%s)"
+          echo "Provo a creare la cartella su Drive: $TEST_FOLDER"
+          rclone mkdir "gdrive:$TEST_FOLDER"
+          echo "✅ Rclone ha funzionato! Cartella test creata con successo."
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: 12.6.2
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Set environment variables for Android
+        run: |
+          echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
+          echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
+          echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASEOUT }}" >> $GITHUB_ENV
+
+      - name: Extract app.json info
+        id: extract-transform-name-android
+        run: |
+          ANDROID_PACKAGE=$(jq -r '.expo.android.package' app.json)
+          APP_NAME=$(jq -r '.expo.name' app.json)
+          APP_VERSION=$(jq -r '.expo.version' app.json)
+          echo "ANDROID_PACKAGE=$ANDROID_PACKAGE" >> $GITHUB_ENV
+          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+
+      - name: Determine if screenshots should be forced
+        run: |
+          if [[ "${{ github.event.inputs.forceScreenshots }}" == "true" || "${{ env.APP_VERSION }}" == "1.0.0" ]]; then
+            echo "FORCE_SCREENSHOTS=true" >> $GITHUB_ENV
+          else
+            echo "FORCE_SCREENSHOTS=false" >> $GITHUB_ENV
+          fi
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Decode and Create Google Play Json Key
+        run: |
+          echo "${{ env.GOOGLE_PLAY_JSON_KEY_BASE64 }}" | base64 --decode > google_play_json_key.json
+
+      - name: Create detox build to take screenshots
+        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+        run: npm run build:android:test
+
+      - name: Decompress detox build artifact
+        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+        run: |
+          mkdir -p ./builds
+          tar -xzvf build-*.tar.gz -C ./builds
+
+      - name: Enable KVM for running Android Emulator
+        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Take app screenshots on Android Emulator 🤖
+        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          avd-name: Nexus_6_API_33
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: npm run generate:android:screenshots
+
+      - name: Build Android
+        run: npm run build:android
+
+      - name: Upload .aab finale su Google Drive 📦
+        run: |
+          DEST="gdrive:screenshots-sibook/${{ env.APP_NAME }}_${{ env.APP_VERSION }}"
+          echo "Caricamento .aab finale su Drive in: $DEST"
+          AAB_FILE=$(ls /home/runner/work/automation-build/automation-build/build-*.aab | head -n 1)
+          if [ -f "$AAB_FILE" ]; then
+            echo "✅ File trovato: $AAB_FILE"
+            rclone copy "$AAB_FILE" "$DEST/app-release.aab"
+            echo "✅ .aab caricato con successo su Google Drive."
+          else
+            echo "❌ Nessun file .aab trovato!"
+            exit 1
+          fi
+
+      - name: Upload the update to the Play Store 🚀
+        if: env.APP_VERSION != '1.0.0'
+        env:
+          ANDROID_PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
+          GOOGLE_PLAY_JSON_KEY: google_play_json_key.json
           SKIP_SCREENSHOTS: ${{ env.FORCE_SCREENSHOTS == 'false' }}
-        run: bundle exec fastlane upload_ipa_to_app_store
+        run: fastlane upload_aab_to_play_store
+
+      - name: Checkout Easybook Automation Repository
+        if: env.APP_VERSION == '1.0.0'
+        uses: actions/checkout@v3
+        with:
+          repository: lorenzomalla/easybook-release-automation-android
+          token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
+          path: easybook-release-automation-android
+
+      - name: Install Easybook release automation dependencies
+        if: env.APP_VERSION == '1.0.0'
+        run: npm install
+        working-directory: easybook-release-automation-android
+
+      - name: Create the app on the Play Store with Easybook Automation 📲
+        if: env.APP_VERSION == '1.0.0'
+        run: npm run start
+        working-directory: easybook-release-automation-android
+        env:
+          GOOGLE_PLAY_EMAIL: ${{ env.GOOGLE_PLAY_EMAIL }}
+          GOOGLE_PLAY_PASSWORD: ${{ env.GOOGLE_PLAY_PASSWORD }}
 
   build_android:
     runs-on: ubuntu-latest
