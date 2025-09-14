@@ -202,7 +202,7 @@ jobs:
           EXPO_APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
           EXPO_APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
           EXPO_APPLE_API_KEY_PATH: "fastlane/AuthKey.p8"
-        run: npm run build:ios
+        run: eas build -p ios --profile production --non-interactive
 
       - name: Upload to App Store
         env:
