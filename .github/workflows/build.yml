@@ -32,12 +32,12 @@ jobs:
         with:
           ruby-version: '3.2'
           bundler-cache: true
-      
-      - name: Create Gemfile and install gems
+
+      - name: Create Gemfile and install gems (Fastlane from fork @ commit)
         run: |
           cat > Gemfile <<'EOF'
           source "https://rubygems.org"
-          gem "fastlane", ">= 2.228.0"
+          gem "fastlane", github: "Jeff-Tian/fastlane", ref: "1121bd3271d1136d7419e40772d46c22554aa84f"
           EOF
           bundle install --jobs 4 --retry 3
       
@@ -66,7 +66,6 @@ jobs:
           bundle exec fastlane --version
           ruby -v
           bundle show fastlane
-
       # Step per settare le variabili d'ambiente basato su USE_LORENZO e gestire il file APPLE_P8
       - name: Set environment variables for iOS and handle APPLE_P8
         run: |
@@ -78,7 +77,6 @@ jobs:
           echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64 }}" >> $GITHUB_ENV
           echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
           echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
-
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
@@ -88,7 +86,7 @@ jobs:
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
-          eas-version: 16.19.1
+          eas-version: 14.4.0
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Select Xcode version
@@ -121,7 +119,6 @@ jobs:
           echo "EXTENSION_BUNDLE_ID=$EXTENSION_BUNDLE_ID" >> $GITHUB_ENV
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
-
       - name: Determine if screenshots should be forced
         run: |
           if [[ "${{ github.event.inputs.forceScreenshots }}" == "true" || "${{ env.APP_VERSION }}" == "1.0.0" ]]; then
@@ -129,62 +126,22 @@ jobs:
           else
             echo "FORCE_SCREENSHOTS=false" >> $GITHUB_ENV
           fi
-
+      - name: Create Keychain
+        run: |
+          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+      - name: Decode and Create Certificate and Provisioning Profile
+        run: |
+          echo "${{ env.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
+          security import certificate.p12 -P "${{ env.CERT_P12_PASSWORD }}" -A -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
       - name: Configure Fastlane API Key
         run: |
-          echo "=== 🔧 CONFIGURAZIONE FASTLANE API KEY ==="
-          if [[ "$USE_LORENZO" == "true" ]]; then
-            echo "Using Lorenzo Apple P8"
-            echo "${{ secrets.LORENZO_APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
-          else
-            echo "Using standard Apple P8"
-            echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
-          fi
-          
-          # Verifica che il file sia stato creato
-          if [ -f "fastlane/AuthKey.p8" ]; then
-            echo "✅ AuthKey.p8 creato correttamente"
-            ls -la fastlane/AuthKey.p8
-          else
-            echo "❌ AuthKey.p8 NON creato"
-            exit 1
-          fi
-          
-          # Crea api_key.json
+          echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
           jq -n --arg key_id "${{ env.APPLE_KEY_ID }}" --arg issuer_id "${{ env.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
             '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
-          
-          echo "✅ api_key.json creato"
-          echo "=== Contenuto api_key.json ==="
-          cat fastlane/api_key.json
-          echo "=== ✅ FINE CONFIGURAZIONE FASTLANE ==="
-
-      - name: Verify Certificates and Profiles
-        run: |
-          echo "=== 🔍 VERIFICA CERTIFICATI E PROFILI ==="
-          
-          # Verifica certificati nel keychain di sistema
-          echo "=== Certificati nel keychain di sistema ==="
-          security find-identity -v -p codesigning login.keychain
-          echo ""
-          
-          # Verifica certificati nel nostro keychain
-          echo "=== Certificati nel nostro keychain ==="
-          security find-identity -v -p codesigning build.keychain
-          echo ""
-          
-          # Verifica provisioning profiles
-          echo "=== Provisioning profiles ==="
-          ls -la *.mobileprovision || echo "❌ Nessun provisioning profile trovato"
-          echo ""
-          
-          # Verifica certificato P12
-          echo "=== Certificato P12 ==="
-          ls -la certificate.p12 || echo "❌ Certificato P12 non trovato"
-          echo ""
-          
-          echo "=== ✅ FINE VERIFICA ==="
-
       - name: Run Fastlane Create App
         env:
           AUTH_KEY_PATH: "fastlane/AuthKey.p8"
@@ -194,97 +151,50 @@ jobs:
           BUNDLE_ID: ${{ env.BUNDLE_ID }}
           EXTENSION_BUNDLE_ID: ${{ env.EXTENSION_BUNDLE_ID }}
           APP_NAME: ${{ env.APP_NAME }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-        run: |
-          echo "=== 🚀 FASTLANE CREATE APP (PROVISIONING PROFILES) ==="
-          echo "AUTH_KEY_PATH: $AUTH_KEY_PATH"
-          echo "APPLE_ID: $APPLE_ID"
-          echo "APPLE_KEY_ID: $APPLE_KEY_ID"
-          echo "APPLE_ISSUER_ID: $APPLE_ISSUER_ID"
-          echo "BUNDLE_ID: $BUNDLE_ID"
-          echo "EXTENSION_BUNDLE_ID: $EXTENSION_BUNDLE_ID"
-          echo "APP_NAME: $APP_NAME"
-          echo "KEYCHAIN_PASSWORD: [HIDDEN]"
-          echo ""
-          
-          # Verifica che i certificati siano disponibili
-          echo "=== Verifica certificati disponibili ==="
-          security find-identity -v -p codesigning login.keychain
-          echo ""
-          
-          # Esegui Fastlane per creare i provisioning profiles
-          bundle exec fastlane create_app
-          echo "=== ✅ FINE FASTLANE CREATE APP ==="
+          CI: "true"  # AGGIUNGI QUESTA LINEA
+          GITHUB_ACTIONS: "true"  # AGGIUNGI QUESTA LINEA
+        run: bundle exec fastlane create_app
 
-      - name: Debug EAS Configuration
+      - name: Create credentials.json
         run: |
-          echo "=== 🔍 DEBUG EAS CONFIGURATION ==="
-          echo "=== Contenuto eas.json ==="
-          cat eas.json
-          echo ""
-          echo "=== Contenuto app.json ==="
-          cat app.json
-          echo ""
-          echo "=== Verifica EAS CLI ==="
-          eas --version
-          echo ""
-          echo "=== Verifica autenticazione EAS ==="
-          eas whoami
-          echo ""
-          echo "=== Verifica progetto EAS ==="
-          eas project:info
-          echo "=== ✅ FINE DEBUG EAS CONFIGURATION ==="
-
-      - name: Debug Environment Variables
-        run: |
-          echo "=== 🔍 DEBUG ENVIRONMENT VARIABLES ==="
-          echo "BUNDLE_TARGET: $BUNDLE_TARGET"
-          echo "BUNDLE_ID: $BUNDLE_ID"
-          echo "EXTENSION_BUNDLE_ID: $EXTENSION_BUNDLE_ID"
-          echo "APP_NAME: $APP_NAME"
-          echo "APP_VERSION: $APP_VERSION"
-          echo "APPLE_ID: $APPLE_ID"
-          echo "APPLE_KEY_ID: $APPLE_KEY_ID"
-          echo "APPLE_ISSUER_ID: $APPLE_ISSUER_ID"
-          echo "APPLE_TEAM_ID: $APPLE_TEAM_ID"
-          echo "FORCE_SCREENSHOTS: $FORCE_SCREENSHOTS"
-          echo "=== ✅ FINE DEBUG ENVIRONMENT VARIABLES ==="
-
+          echo '{
+            "ios": {
+              "OneSignalNotificationServiceExtension": {
+                "distributionCertificate": {
+                  "path": "certificate.p12",
+                  "password": "'${{ env.CERT_P12_PASSWORD }}'"
+                },
+                "provisioningProfilePath": "provisioning_profile_onesignal.mobileprovision"
+              },
+              "'$BUNDLE_TARGET'": {
+                "distributionCertificate": {
+                  "path": "certificate.p12",
+                  "password": "'${{ env.CERT_P12_PASSWORD }}'"
+                },
+                "provisioningProfilePath": "provisioning_profile.mobileprovision"
+              }
+            }
+          }' > ./credentials.json
       - name: Install Apple Sim utils to take screenshots
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
-          echo "=== 📱 INSTALL APPLE SIM UTILS ==="
           brew tap wix/brew
           brew install applesimutils
-          echo "=== ✅ FINE INSTALL APPLE SIM UTILS ==="
-
       - name: Detox rebuild framework cache
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
-        run: |
-          echo "=== 🔄 DETOX REBUILD FRAMEWORK CACHE ==="
-          yarn detox rebuild-framework-cache
-          echo "=== ✅ FINE DETOX REBUILD FRAMEWORK CACHE ==="
+        run: yarn detox rebuild-framework-cache
 
       - name: Create detox build to take screenshots
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
-        run: |
-          echo "=== 📱 CREATE DETOX BUILD ==="
-          npm run build:ios:test
-          echo "=== ✅ FINE CREATE DETOX BUILD ==="
+        run: npm run build:ios:test
 
       - name: Decompress detox build artifact
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
-          echo "=== 📦 DECOMPRESS DETOX BUILD ARTIFACT ==="
           tar -xzvf build-*.tar.gz -C ./
-          echo "=== ✅ FINE DECOMPRESS DETOX BUILD ARTIFACT ==="
-
       - name: Take app screenshots
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
-        run: |
-          echo "=== 📸 TAKE APP SCREENSHOTS ==="
-          npm run generate:ios:screenshots
-          echo "=== ✅ FINE TAKE APP SCREENSHOTS ==="
+        run: npm run generate:ios:screenshots
 
       - name: Build iOS
         env:
@@ -292,46 +202,7 @@ jobs:
           EXPO_APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
           EXPO_APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
           EXPO_APPLE_API_KEY_PATH: "fastlane/AuthKey.p8"
-          # Debug
-          DEBUG: "1"
-          EXPO_DEBUG: "1"
-          EXPO_SKIP_DOCTOR: "true"
-        run: |
-          echo "=== 🚀 INIZIO BUILD iOS ==="
-          echo "=== Variabili d'ambiente per il build ==="
-          echo "EXPO_APPLE_TEAM_ID: $EXPO_APPLE_TEAM_ID"
-          echo "EXPO_APPLE_KEY_ID: $EXPO_APPLE_KEY_ID"
-          echo "EXPO_APPLE_ISSUER_ID: $EXPO_APPLE_ISSUER_ID"
-          echo "EXPO_APPLE_API_KEY_PATH: $EXPO_APPLE_API_KEY_PATH"
-          echo "DEBUG: $DEBUG"
-          echo "EXPO_DEBUG: $EXPO_DEBUG"
-          echo "EXPO_SKIP_DOCTOR: $EXPO_SKIP_DOCTOR"
-          echo ""
-          
-          # Verifica file AuthKey.p8
-          if [ -f "fastlane/AuthKey.p8" ]; then
-            echo "✅ AuthKey.p8 trovato"
-            ls -la fastlane/AuthKey.p8
-          else
-            echo "❌ AuthKey.p8 NON trovato"
-            exit 1
-          fi
-          
-          echo "=== Esecuzione EAS build ==="
-          eas build -p ios --non-interactive --local
-          
-          echo "=== ✅ BUILD iOS COMPLETATO ==="
-
-      - name: Post-Build Debug
-        run: |
-          echo "=== 🔍 POST-BUILD DEBUG ==="
-          echo "=== Verifica file generati ==="
-          ls -la *.ipa || echo "❌ Nessun file IPA trovato"
-          ls -la *.tar.gz || echo "❌ Nessun file tar.gz trovato"
-          echo ""
-          echo "=== Verifica log EAS ==="
-          ls -la ~/.expo/ || echo "❌ Cartella .expo non trovata"
-          echo "=== ✅ FINE POST-BUILD DEBUG ==="
+        run: npm run build:ios
 
       - name: Upload to App Store
         env:
@@ -339,15 +210,7 @@ jobs:
           APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
           SKIP_SCREENSHOTS: ${{ env.FORCE_SCREENSHOTS == 'false' }}
-        run: |
-          echo "=== 📤 UPLOAD TO APP STORE ==="
-          echo "AUTH_KEY_PATH: $AUTH_KEY_PATH"
-          echo "APPLE_KEY_ID: $APPLE_KEY_ID"
-          echo "APPLE_ISSUER_ID: $APPLE_ISSUER_ID"
-          echo "SKIP_SCREENSHOTS: $SKIP_SCREENSHOTS"
-          echo ""
-          bundle exec fastlane upload_ipa_to_app_store
-          echo "=== ✅ FINE UPLOAD TO APP STORE ==="
+        run: bundle exec fastlane upload_ipa_to_app_store
 
   build_android:
     runs-on: ubuntu-latest
@@ -397,7 +260,6 @@ jobs:
           echo "Provo a creare la cartella su Drive: $TEST_FOLDER"
           rclone mkdir "gdrive:$TEST_FOLDER"
           echo "✅ Rclone ha funzionato! Cartella test creata con successo."
-
       - name: Setup EAS
         uses: expo/expo-github-action@v8
         with:
@@ -410,7 +272,6 @@ jobs:
           echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
           echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
           echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
-
       - name: Extract app.json info
         id: extract-transform-name
         run: |
@@ -420,7 +281,6 @@ jobs:
           echo "ANDROID_PACKAGE=$ANDROID_PACKAGE" >> $GITHUB_ENV
           echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-
       - name: Determine if screenshots should be forced
         run: |
           if [[ "${{ github.event.inputs.forceScreenshots }}" == "true" || "${{ env.APP_VERSION }}" == "1.0.0" ]]; then
@@ -428,7 +288,6 @@ jobs:
           else
             echo "FORCE_SCREENSHOTS=false" >> $GITHUB_ENV
           fi
-
       - name: Set up Java 17
         uses: actions/setup-java@v3
         with:
@@ -441,7 +300,6 @@ jobs:
       - name: Decode and Create Google Play Json Key
         run: |
           echo "${{ env.GOOGLE_PLAY_JSON_KEY_BASE64 }}" | base64 --decode > google_play_json_key.json
-
       - name: Create detox build to take screenshots
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: npm run build:android:test
@@ -451,14 +309,12 @@ jobs:
         run: |
           mkdir -p ./builds
           tar -xzvf build-*.tar.gz -C ./builds
-
       - name: Enable KVM for running Android Emulator
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-
       - name: Take app screenshots on Android Emulator 🤖
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         uses: reactivecircus/android-emulator-runner@v2
