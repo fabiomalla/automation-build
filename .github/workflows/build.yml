@@ -279,8 +279,32 @@ jobs:
       - name: Decompress detox build artifact
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
+          set -euo pipefail
+          echo "=== 📂 Current directory ==="
+          echo "PWD: $PWD"
+          echo "=== 📄 Listing files ==="
+          ls -al
+      
+          echo "=== 📂 Searching for build artifacts ==="
+          find ${{ github.workspace }} -maxdepth 1 -type f -name 'build-*.tar.gz' -printf '%TY-%Tm-%Td %TT %p\n' | sort -r || echo "No files found."
+      
           mkdir -p ./builds
-          tar -xzvf build-*.tar.gz -C ./builds
+          ARTIFACT_PATH="$(ls -1t ${{ github.workspace }}/build-*.tar.gz | head -n1 || true)"
+      
+          if [[ -z "$ARTIFACT_PATH" ]]; then
+            echo "❌ Nessun artifact trovato! Uscita con errore."
+            exit 1
+          fi
+      
+          echo "✅ Artifact selezionato: $ARTIFACT_PATH"
+          echo "=== 📦 Test contenuto dell'archivio ==="
+          tar -tzf "$ARTIFACT_PATH" | head -n 10 || echo "⚠️ Impossibile leggere il contenuto (archivio corrotto?)"
+      
+          echo "=== 🔓 Estrazione archivio ==="
+          tar -xzvf "$ARTIFACT_PATH" -C ./builds
+      
+          echo "=== ✅ Contenuto estratto in ./builds ==="
+          ls -R ./builds
 
       - name: Enable KVM for running Android Emulator
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
