@@ -268,6 +268,15 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Configure Android for Expo 53
+        run: |
+          # Esegui prebuild per generare i file Android
+          npx expo prebuild --platform android --clean
+          
+          # Applica le configurazioni personalizzate
+          chmod +x ./scripts/configure-android.sh
+          ./scripts/configure-android.sh
+
       - name: Decode and Create Google Play Json Key
         run: |
           echo "${{ env.GOOGLE_PLAY_JSON_KEY_BASE64 }}" | base64 --decode > google_play_json_key.json
