@@ -70,6 +70,7 @@ jobs:
           echo 'export GEM_HOME=$HOME/.gem' >> $GITHUB_ENV
           echo 'export PATH=$HOME/.gem/bin:$PATH' >> $GITHUB_ENV
           gem install --user-install fastlane -NV
+          
       - name: Extract and transform app name from app.json
         id: extract-transform-name
         run: |
@@ -176,54 +177,55 @@ jobs:
           echo "${{ secrets.RCLONE_CONFIG_BASE64 }}" | base64 --decode > ~/.config/rclone/rclone.conf
           rclone version
 
-      - name: Upload iOS screenshots and logo to Google Drive 📤
+      - name: Detect iOS screenshots path
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+        id: detect_ios_screenshots
+        shell: bash
         run: |
           set -euo pipefail
-
-          DEST="gdrive:screenshots-sibook/${{ env.APP_NAME }}_${{ env.APP_VERSION }}/ios"
-          echo "Creazione cartella su Drive: $DEST"
-          rclone mkdir "$DEST"
-
-          echo "🔎 Cerco la cartella degli screenshot iOS…"
           CANDIDATES=(
-            "./fastlane/metadata/ios/it-IT/images"            # alcune strutture Detox/Deliver
-            "./fastlane/metadata/it-IT/images"                # Deliver recente
-            "./fastlane/screenshots/it-IT"                    # fastlane snapshot classico
-            "./fastlane/metadata/it-IT"                       # fallback Deliver
+            "./fastlane/screenshots/it"                 # tua cartella attuale
+            "./fastlane/screenshots/it-IT"
+            "./fastlane/metadata/screenshots/it"
+            "./fastlane/metadata/ios/it/screenshots"
+            "./fastlane/metadata/ios/it-IT/images"
           )
 
           IOS_SRC=""
           for d in "${CANDIDATES[@]}"; do
-            if [ -d "$d" ] && [ "$(find "$d" -type f -name '*.png' | wc -l)" -gt 0 ]; then
+            if [ -d "$d" ] && find "$d" -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.heic' \) | grep -q .; then
               IOS_SRC="$d"
               break
             fi
           done
 
           if [ -z "$IOS_SRC" ]; then
-            echo "❌ Nessuna cartella screenshot trovata nelle path note. Eseguo un elenco per debug:"
-            find fastlane -maxdepth 4 -type d | sed 's/^/  - /'
+            echo "❌ Nessuna cartella screenshot trovata nelle path note."
+            echo "=== PNG trovati in fastlane ==="
+            find fastlane -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.heic' \) -printf '  - %p\n' || true
             exit 1
           fi
 
-          echo "✅ Trovata cartella screenshot: $IOS_SRC"
-          echo "🔼 Copio screenshot su Drive…"
+          echo "✅ Screenshot path: $IOS_SRC"
+          echo "IOS_SRC=$IOS_SRC" >> $GITHUB_ENV
+
+      - name: Upload iOS screenshots and logo to Google Drive 📤
+        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+        run: |
+          set -euo pipefail
+          DEST="gdrive:screenshots-sibook/${{ env.APP_NAME_SAFE }}_${{ env.APP_VERSION }}/ios"
+          echo "Creazione cartella: $DEST"
+          rclone mkdir "$DEST"
+
+          echo "🔼 Copio screenshot da: $IOS_SRC"
           rclone copy "$IOS_SRC" "$DEST/screenshots" --create-empty-src-dirs
 
-          # Logo opzionale (stessa logica che usi in Android)
           if [ -f "./assets/images/logo-lg.png" ]; then
-            echo "🔼 Copio icona/logo…"
+            echo "🔼 Copio logo"
             rclone copy "./assets/images/logo-lg.png" "$DEST/logo.png"
           else
-            echo "ℹ️  Nessun logo trovato in ./assets/images/logo-lg.png (passo)."
+            echo "ℹ️ Nessun logo trovato in ./assets/images/logo-lg.png"
           fi
-
-          # (Opzionale) carico anche un archivio zip di comodo
-          echo "📦 Creo e carico uno ZIP degli screenshot…"
-          ZIP_PATH="ios_screenshots_${{ env.APP_VERSION }}.zip"
-          (cd "$IOS_SRC" && zip -r "../$ZIP_PATH" . >/dev/null)
-          rclone copy "fastlane/metadata/$ZIP_PATH" "$DEST/$ZIP_PATH" || true
 
       - name: Build iOS
         env:
