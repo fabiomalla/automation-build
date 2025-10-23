@@ -213,7 +213,7 @@ jobs:
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
           set -euo pipefail
-          DEST="gdrive:screenshots-sibook/${{ env.APP_NAME_SAFE }}_${{ env.APP_VERSION }}/ios"
+          DEST="gdrive:screenshots-sibook/${{ env.APP_NAME_SAFE }}_${{ env.APP_VERSION }}_${{ env.APP_NAME_SAFE }}/ios"
           echo "Creazione cartella: $DEST"
           rclone mkdir "$DEST"
 
