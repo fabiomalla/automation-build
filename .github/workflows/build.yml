@@ -85,6 +85,14 @@ jobs:
           echo "EXTENSION_BUNDLE_ID=$EXTENSION_BUNDLE_ID" >> $GITHUB_ENV
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+
+          APP_NAME_SAFE=$(echo "$APP_NAME" \
+            | iconv -f UTF-8 -t ASCII//TRANSLIT 2>/dev/null \
+            | tr '[:space:]/' '_' \
+            | tr -cd 'A-Za-z0-9._-')
+          echo "APP_NAME_SAFE=$APP_NAME_SAFE" >> $GITHUB_ENV
+
+          
       - name: Determine if screenshots should be forced
         run: |
           if [[ "${{ github.event.inputs.forceScreenshots }}" == "true" ]]; then
@@ -98,11 +106,15 @@ jobs:
           security default-keychain -s build.keychain
           security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
           security set-keychain-settings -t 3600 -u build.keychain
+
+          
       - name: Decode and Create Certificate and Provisioning Profile
         run: |
           echo "${{ env.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
           security import certificate.p12 -P "${{ env.CERT_P12_PASSWORD }}" -A -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+
+          
       - name: Configure Fastlane API Key
         run: |
           if [[ "$USE_LORENZO" == "true" ]]; then
@@ -112,6 +124,8 @@ jobs:
           fi
           jq -n --arg key_id "${{ env.APPLE_KEY_ID }}" --arg issuer_id "${{ env.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
             '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
+
+
       - name: Run Fastlane Create App
         env:
           AUTH_KEY_PATH: "fastlane/AuthKey.p8"
@@ -143,6 +157,7 @@ jobs:
               }
             }
           }' > ./credentials.json
+          
       - name: Install Apple Sim utils to take screenshots
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
@@ -213,19 +228,25 @@ jobs:
         if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
         run: |
           set -euo pipefail
-          DEST="gdrive:screenshots-sibook/${{ env.APP_NAME_SAFE }}_${{ env.APP_VERSION }}_${{ env.APP_NAME_SAFE }}/ios"
+
+          # ricava il locale (es. it, it-IT) dalla cartella sorgente rilevata
+          LOCALE="$(basename "$IOS_SRC" || echo "it")"
+
+          # struttura cartelle: screenshots-sibook/<versione>/<nome>/ios/<locale>
+          DEST="gdrive:screenshots-sibook/${APP_VERSION}/${APP_NAME_SAFE}/ios/${LOCALE}"
           echo "Creazione cartella: $DEST"
-          rclone mkdir "$DEST"
+          rclone mkdir "$DEST" || true
 
           echo "🔼 Copio screenshot da: $IOS_SRC"
-          rclone copy "$IOS_SRC" "$DEST/screenshots" --create-empty-src-dirs
+          rclone copy "$IOS_SRC" "$DEST" --create-empty-src-dirs
 
           if [ -f "./assets/images/logo-lg.png" ]; then
             echo "🔼 Copio logo"
-            rclone copy "./assets/images/logo-lg.png" "$DEST/logo.png"
+            rclone copy "./assets/images/logo-lg.png" "gdrive:screenshots-sibook/${APP_VERSION}/${APP_NAME_SAFE}/logo.png"
           else
             echo "ℹ️ Nessun logo trovato in ./assets/images/logo-lg.png"
           fi
+          
 
       - name: Build iOS
         env:
