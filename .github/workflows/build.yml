@@ -246,7 +246,11 @@ jobs:
           else
             echo "ℹ️ Nessun logo trovato in ./assets/images/logo-lg.png"
           fi
-          
+
+      - name: Pre-clean simulator (safe)
+        run: |
+          xcrun simctl shutdown all || true
+          pkill -9 -f "Simulator.app" || true
 
       - name: Build iOS
         env:
