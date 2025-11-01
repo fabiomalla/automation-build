@@ -1,0 +1,351 @@
+run-name: ${{ github.event.inputs.branch || 'Build and Deploy' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to build"
+        required: true
+      forceScreenshots:
+        description: "Force screenshots creation"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+jobs:
+  build_ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout the Private Repository
+        uses: actions/checkout@v3
+        with:
+          repository: lorenzomalla/easybook-app-refactor
+          token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Set environment variables for iOS and handle APPLE_P8
+        run: |
+          echo "Setting default environment variables"
+          echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
+          echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
+          echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
+          echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+          echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64 }}" >> $GITHUB_ENV
+          echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
+          echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: ".node-version"
+          cache: "npm"
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: 14.4.0
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Select Xcode version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 16.4
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install jq
+        run: |
+          if ! command -v jq &> /dev/null; then
+            brew install jq
+          else
+            echo "jq is already installed"
+          fi
+      - name: Install Fastlane on macOS (user install)
+        run: |
+          echo 'export GEM_HOME=$HOME/.gem' >> $GITHUB_ENV
+          echo 'export PATH=$HOME/.gem/bin:$PATH' >> $GITHUB_ENV
+          gem install --user-install fastlane -NV
+
+      - name: Extract and transform app name from app.json
+        id: extract-transform-name
+        run: |
+          NAME=$(jq -r '.expo.name' app.json)
+          BUNDLE_TARGET=$(echo $NAME | tr -d " .'&-" )
+          BUNDLE_ID=$(jq -r '.expo.ios.bundleIdentifier' app.json)
+          EXTENSION_BUNDLE_ID="${BUNDLE_ID}.OneSignalNotificationServiceExtension"
+          APP_VERSION=$(jq -r '.expo.version' app.json)
+          APP_NAME=$(jq -r '.expo.name' app.json)
+          echo "BUNDLE_TARGET=$BUNDLE_TARGET" >> $GITHUB_ENV
+          echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
+          echo "EXTENSION_BUNDLE_ID=$EXTENSION_BUNDLE_ID" >> $GITHUB_ENV
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+
+          APP_NAME_SAFE=$(echo "$APP_NAME" \
+            | iconv -f UTF-8 -t ASCII//TRANSLIT 2>/dev/null \
+            | tr '[:space:]/' '_' \
+            | tr -cd 'A-Za-z0-9._-')
+          echo "APP_NAME_SAFE=$APP_NAME_SAFE" >> $GITHUB_ENV
+
+      - name: Determine if screenshots should be forced
+        run: |
+          if [[ "${{ github.event.inputs.forceScreenshots }}" == "true" ]]; then
+            echo "FORCE_SCREENSHOTS=true" >> $GITHUB_ENV
+          else
+            echo "FORCE_SCREENSHOTS=false" >> $GITHUB_ENV
+          fi
+      - name: Create Keychain
+        run: |
+          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+
+      - name: Decode and Create Certificate and Provisioning Profile
+        run: |
+          echo "${{ env.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
+          security import certificate.p12 -P "${{ env.CERT_P12_PASSWORD }}" -A -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+
+      - name: Configure Fastlane API Key
+        run: |
+          if [[ "$USE_LORENZO" == "true" ]]; then
+            echo "${{ secrets.LORENZO_APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
+          else
+            echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
+          fi
+          jq -n --arg key_id "${{ env.APPLE_KEY_ID }}" --arg issuer_id "${{ env.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
+            '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
+
+      - name: Run Fastlane Create App
+        env:
+          AUTH_KEY_PATH: "fastlane/AuthKey.p8"
+          APPLE_ID: ${{ env.APPLE_ID }}
+          APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
+          APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
+          BUNDLE_ID: ${{ env.BUNDLE_ID }}
+          EXTENSION_BUNDLE_ID: ${{ env.EXTENSION_BUNDLE_ID }}
+          APP_NAME: ${{ env.APP_NAME }}
+        run: fastlane create_app
+
+      - name: Create credentials.json
+        run: |
+          echo '{
+            "ios": {
+              "OneSignalNotificationServiceExtension": {
+                "distributionCertificate": {
+                  "path": "certificate.p12",
+                  "password": "'${{ env.CERT_P12_PASSWORD }}'"
+                },
+                "provisioningProfilePath": "provisioning_profile_onesignal.mobileprovision"
+              },
+              "'$BUNDLE_TARGET'": {
+                "distributionCertificate": {
+                  "path": "certificate.p12",
+                  "password": "'${{ env.CERT_P12_PASSWORD }}'"
+                },
+                "provisioningProfilePath": "provisioning_profile.mobileprovision"
+              }
+            }
+          }' > ./credentials.json
+
+      - name: Verify iOS screenshots exist
+        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+        run: |
+          set -euo pipefail
+
+          LANGUAGES=("it" "en" "es-ES" "fr-FR" "ca" "sq")
+          MISSING=()
+
+          for LOCALE in "${LANGUAGES[@]}"; do
+            SCREENSHOT_DIR="./fastlane/metadata/screenshots/${LOCALE}"
+            if [ ! -d "$SCREENSHOT_DIR" ] || [ -z "$(ls -A "$SCREENSHOT_DIR" 2>/dev/null)" ]; then
+              MISSING+=("$LOCALE")
+            else
+              echo "✅ Screenshot trovati per ${LOCALE}: $(ls "$SCREENSHOT_DIR" | wc -l) file"
+            fi
+          done
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "⚠️ Nessuno screenshot trovato per: ${MISSING[*]}"
+            echo "⚠️ Usando screenshot da 'it' come fallback..."
+            for LOCALE in "${MISSING[@]}"; do
+              if [ "$LOCALE" != "it" ] && [ -d "./fastlane/metadata/screenshots/it" ]; then
+                mkdir -p "./fastlane/metadata/screenshots/${LOCALE}"
+                cp -r ./fastlane/metadata/screenshots/it/* "./fastlane/metadata/screenshots/${LOCALE}/" || true
+                echo "✅ Copiati screenshot da 'it' a '${LOCALE}'"
+              fi
+            done
+          fi
+
+          echo "✅ Screenshot iOS pronti per Fastlane"
+
+      - name: Pre-clean simulator (safe)
+        run: |
+          xcrun simctl shutdown all || true
+          pkill -9 -f "Simulator.app" || true
+
+      - name: Build iOS
+        env:
+          EXPO_APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
+          EXPO_APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
+          EXPO_APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
+          EXPO_APPLE_API_KEY_PATH: "fastlane/AuthKey.p8"
+        run: npm run build:ios
+
+      - name: Upload to App Store
+        env:
+          AUTH_KEY_PATH: "fastlane/AuthKey.p8"
+          APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
+          APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
+          SKIP_SCREENSHOTS: ${{ env.FORCE_SCREENSHOTS == 'false' }}
+        run: fastlane upload_ipa_to_app_store
+
+  build_android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete unnecessary tools 🔧
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: false # Keep Don't remove Android tools
+          tool-cache: true # Remove image tool cache - rm -rf "$AGENT_TOOLSDIRECTORY"
+          dotnet: true # rm -rf /usr/share/dotnet
+          haskell: true # rm -rf /opt/ghc...
+          swap-storage: true # rm -f /mnt/swapfile (4GiB)
+          docker-images: false # Takes 16s (`nowinandroid`), enable if needed in the future
+          large-packages: false # includes google-cloud-sdk and it's slow
+
+      - name: Checkout the Private Repository
+        uses: actions/checkout@v3
+        with:
+          repository: lorenzomalla/easybook-app-refactor
+          token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: ".node-version"
+          cache: "npm"
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: 12.6.2
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # Step to set environment variables for Android based on lorenzo.txt
+      - name: Set environment variables for Android
+        run: |
+          echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
+          echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
+          echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
+
+      - name: Extract app.json info
+        id: extract-transform-name
+        run: |
+          ANDROID_PACKAGE=$(jq -r '.expo.android.package' app.json)
+          APP_NAME=$(jq -r '.expo.name' app.json)
+          APP_VERSION=$(jq -r '.expo.version' app.json)
+          echo "ANDROID_PACKAGE=$ANDROID_PACKAGE" >> $GITHUB_ENV
+          echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+
+      - name: Determine if screenshots should be forced
+        run: |
+          if [[ "${{ github.event.inputs.forceScreenshots }}" == "true" || "${{ env.APP_VERSION }}" == "1.0.0" ]]; then
+            echo "FORCE_SCREENSHOTS=true" >> $GITHUB_ENV
+          else
+            echo "FORCE_SCREENSHOTS=false" >> $GITHUB_ENV
+          fi
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Configure Android for Expo 53
+        run: |
+          # Esegui prebuild per generare i file Android
+          npx expo prebuild --platform android --clean
+
+          # Applica le configurazioni personalizzate
+          chmod +x ./scripts/configure-android.sh
+          ./scripts/configure-android.sh
+
+      - name: Decode and Create Google Play Json Key
+        run: |
+          echo "${{ env.GOOGLE_PLAY_JSON_KEY_BASE64 }}" | base64 --decode > google_play_json_key.json
+
+      - name: Verify Android screenshots exist
+        if: ${{ env.FORCE_SCREENSHOTS == 'true' }}
+        run: |
+          set -euo pipefail
+
+          LANGUAGES=("it-IT" "en-US" "es-ES" "fr-FR" "ca" "sq")
+          MISSING=()
+
+          for LOCALE in "${LANGUAGES[@]}"; do
+            SCREENSHOT_DIR="./fastlane/metadata/android/${LOCALE}/images/phoneScreenshots"
+            if [ ! -d "$SCREENSHOT_DIR" ] || [ -z "$(ls -A "$SCREENSHOT_DIR" 2>/dev/null)" ]; then
+              MISSING+=("$LOCALE")
+            else
+              echo "✅ Screenshot Android trovati per ${LOCALE}: $(ls "$SCREENSHOT_DIR" | wc -l) file"
+            fi
+          done
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "⚠️ Nessuno screenshot Android trovato per: ${MISSING[*]}"
+            echo "⚠️ Usando screenshot da 'it-IT' come fallback..."
+            for LOCALE in "${MISSING[*]}"; do
+              if [ "$LOCALE" != "it-IT" ] && [ -d "./fastlane/metadata/android/it-IT/images/phoneScreenshots" ]; then
+                mkdir -p "./fastlane/metadata/android/${LOCALE}/images/phoneScreenshots"
+                cp -r ./fastlane/metadata/android/it-IT/images/phoneScreenshots/* "./fastlane/metadata/android/${LOCALE}/images/phoneScreenshots/" || true
+                echo "✅ Copiati screenshot Android da 'it-IT' a '${LOCALE}'"
+              fi
+            done
+          fi
+
+          echo "✅ Screenshot Android pronti per Fastlane"
+
+      - name: Build Android
+        run: npm run build:android
+
+      - name: Upload the update to the Play Store 🚀
+        if: env.APP_VERSION != '1.0.0'
+        env:
+          ANDROID_PACKAGE_NAME: ${{ env.ANDROID_PACKAGE }}
+          GOOGLE_PLAY_JSON_KEY: google_play_json_key.json
+          SKIP_SCREENSHOTS: ${{ env.FORCE_SCREENSHOTS == 'false' }}
+        run: fastlane upload_aab_to_play_store
+
+      - name: Checkout Easybook Automation Repository
+        if: env.APP_VERSION == '1.0.0'
+        uses: actions/checkout@v3
+        with:
+          repository: lorenzomalla/easybook-release-automation-android
+          token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
+          path: easybook-release-automation-android
+
+      - name: Install Easybook release automation dependencies
+        if: env.APP_VERSION == '1.0.0'
+        run: npm install
+        working-directory: easybook-release-automation-android
+
+      - name: Create the app on the Play Store with Easybook Automation 📲
+        if: env.APP_VERSION == '1.0.0'
+        run: npm run start
+        working-directory: easybook-release-automation-android
+        env:
+          GOOGLE_PLAY_EMAIL: ${{ env.GOOGLE_PLAY_EMAIL }}
+          GOOGLE_PLAY_PASSWORD: ${{ env.GOOGLE_PLAY_PASSWORD }}
