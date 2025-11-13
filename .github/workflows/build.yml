@@ -231,8 +231,8 @@ jobs:
           dotnet: true # rm -rf /usr/share/dotnet
           haskell: true # rm -rf /opt/ghc...
           swap-storage: true # rm -f /mnt/swapfile (4GiB)
-          docker-images: false # Takes 16s (`nowinandroid`), enable if needed in the future
-          large-packages: false # includes google-cloud-sdk and it's slow
+          docker-images: false
+          large-packages: false
 
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
@@ -240,6 +240,15 @@ jobs:
           repository: lorenzomalla/easybook-app-refactor
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
+
+      # Flag: se esiste sibook.txt => build per account SiBook
+      - name: Detect SiBook release flag
+        run: |
+          if [ -f sibook.txt ]; then
+            echo "SIBOOK_RELEASE=true" >> $GITHUB_ENV
+          else
+            echo "SIBOOK_RELEASE=false" >> $GITHUB_ENV
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -253,12 +262,20 @@ jobs:
           eas-version: 12.6.2
           token: ${{ secrets.EXPO_TOKEN }}
 
-      # Step to set environment variables for Android based on lorenzo.txt
+      # Sceglie le credenziali Play Store in base a SIBOOK_RELEASE
       - name: Set environment variables for Android
         run: |
-          echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
-          echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
-          echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
+          if [ "$SIBOOK_RELEASE" = "true" ]; then
+            echo "Using SiBook Google Play account"
+            echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL_SIBOOK }}" >> $GITHUB_ENV
+            echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD_SIBOOK }}" >> $GITHUB_ENV
+            echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
+          else
+            echo "Using Lorenzo Google Play account"
+            echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
+            echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
+            echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
+          fi
 
       - name: Extract app.json info
         id: extract-transform-name
@@ -289,10 +306,7 @@ jobs:
 
       - name: Configure Android for Expo 53
         run: |
-          # Esegui prebuild per generare i file Android
           npx expo prebuild --platform android --clean
-          
-          # Applica le configurazioni personalizzate
           chmod +x ./scripts/configure-android.sh
           ./scripts/configure-android.sh
 
@@ -334,6 +348,7 @@ jobs:
       - name: Build Android
         run: npm run build:android
 
+      # Aggiornamenti (APP_VERSION != 1.0.0): usa sempre la JSON key scelta sopra
       - name: Upload the update to the Play Store 🚀
         if: env.APP_VERSION != '1.0.0'
         env:
@@ -342,15 +357,7 @@ jobs:
           SKIP_SCREENSHOTS: ${{ env.FORCE_SCREENSHOTS == 'false' }}
         run: fastlane upload_aab_to_play_store
 
-      - name: Detect SiBook release flag
-        run: |
-          if [ -f sibook.txt ]; then
-            echo "SIBOOK_RELEASE=true" >> $GITHUB_ENV
-          else
-            echo "SIBOOK_RELEASE=false" >> $GITHUB_ENV
-          fi
-
-      # Step che checkouta il repo di automazione (solo alla 1.0.0)
+      # Creazione app (solo 1.0.0) tramite repo di automazione
       - name: Checkout Easybook Automation Repository
         if: env.APP_VERSION == '1.0.0'
         uses: actions/checkout@v3
@@ -359,13 +366,12 @@ jobs:
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           path: easybook-release-automation-android
 
-      # NEW: installa le dipendenze sempre (alla 1.0.0)
       - name: Install Easybook release automation dependencies
         if: env.APP_VERSION == '1.0.0'
         run: npm ci
         working-directory: easybook-release-automation-android
 
-      # NEW: se c'è sibook.txt esegue lo script dedicato
+      # Se SIBOOK_RELEASE = true, usa lo script dedicato (e userà già l'account SiBook)
       - name: Run SiBook release script
         if: env.APP_VERSION == '1.0.0' && env.SIBOOK_RELEASE == 'true'
         run: npm run release:sibook
@@ -374,11 +380,11 @@ jobs:
           GOOGLE_PLAY_EMAIL: ${{ env.GOOGLE_PLAY_EMAIL }}
           GOOGLE_PLAY_PASSWORD: ${{ env.GOOGLE_PLAY_PASSWORD }}
 
-      # Esistente: altrimenti esegue il flusso standard "start"
+      # Altrimenti usa il flusso standard (account Lorenzo)
       - name: Create the app on the Play Store with Easybook Automation 📲
         if: env.APP_VERSION == '1.0.0' && env.SIBOOK_RELEASE == 'false'
         run: npm run start
         working-directory: easybook-release-automation-android
         env:
-          GOOGLE_PLAY_EMAIL: ${{ env.GOOGLE_PLAY_EMAIL_SIBOOK }}
-          GOOGLE_PLAY_PASSWORD: ${{ env.GOOGLE_PLAY_PASSWORD_SIBOOK }}
+          GOOGLE_PLAY_EMAIL: ${{ env.GOOGLE_PLAY_EMAIL }}
+          GOOGLE_PLAY_PASSWORD: ${{ env.GOOGLE_PLAY_PASSWORD }}
