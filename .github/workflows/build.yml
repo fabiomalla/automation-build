@@ -58,6 +58,41 @@ jobs:
             echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
             echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
           fi
+
+
+      - name: Debug Which Apple account is being used
+        run: |
+          echo "===== DEBUG ACCOUNT SELECTION ====="
+          echo "sibook.txt present? -> $SIBOOK_RELEASE"
+
+          if [ "$SIBOOK_RELEASE" = "true" ]; then
+            echo "Using APPLE_ID_SIBOOK"
+            echo "APPLE_ID: ********$(echo '${{ secrets.APPLE_ID_SIBOOK }}' | rev | cut -c1-4 | rev)"
+            echo "APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID_SIBOOK }}"
+            echo "APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID_SIBOOK }}"
+            echo "APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID_SIBOOK }}"
+            echo "CERT_P12_BASE64_SIBOOK: (length: $(echo -n '${{ secrets.CERT_P12_BASE64_SIBOOK }}' | wc -c))"
+          else
+            echo "Using APPLE_ID (Lorenzo)"
+            echo "APPLE_ID: ********$(echo '${{ secrets.APPLE_ID }}' | rev | cut -c1-4 | rev)"
+            echo "APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}"
+            echo "APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}"
+            echo "APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}"
+            echo "CERT_P12_BASE64: (length: $(echo -n '${{ secrets.CERT_P12_BASE64 }}' | wc -c))"
+          fi
+
+          echo "=================================="
+
+      - name: Debug Environment variables summary
+        run: |
+          echo "===== DEBUG ENV VARS ====="
+          echo "SIBOOK_RELEASE: $SIBOOK_RELEASE"
+          echo "APPLE_ID: $(echo $APPLE_ID | sed 's/./*/g')"
+          echo "APPLE_TEAM_ID: $APPLE_TEAM_ID"
+          echo "APPLE_KEY_ID: $APPLE_KEY_ID"
+          echo "APPLE_ISSUER_ID: $APPLE_ISSUER_ID"
+          echo "CERT_P12_BASE64 length: $(echo -n $CERT_P12_BASE64 | wc -c)"
+          echo "====================================="
             
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -143,6 +178,15 @@ jobs:
           echo "${{ env.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
           security import certificate.p12 -P "${{ env.CERT_P12_PASSWORD }}" -A -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+
+      - name: Debug API Key Info
+        run: |
+          echo "===== DEBUG FASTLANE API KEY ====="
+          echo "Using TEAM_ID: $APPLE_TEAM_ID"
+          echo "Using KEY_ID: $APPLE_KEY_ID"
+          echo "Using ISSUER_ID: $APPLE_ISSUER_ID"
+          echo "APPLE_P8 length: $(echo -n $APPLE_P8 | wc -c)"
+          echo "=================================="
 
           
       - name: Configure Fastlane API Key
