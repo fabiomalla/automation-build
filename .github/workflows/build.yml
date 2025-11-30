@@ -19,17 +19,37 @@ jobs:
   build_ios:
     runs-on: macos-latest
 
-    steps:          
+    steps:
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
         with:
           repository: lorenzomalla/easybook-app-refactor
           token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch }}
+
+      - name: Detect SiBook release flag
+        run: |
+          if [ -f sibook.txt ]; then
+            echo "SIBOOK_RELEASE=true" >> $GITHUB_ENV
+          else
+            echo "SIBOOK_RELEASE=false" >> $GITHUB_ENV
+          fi
       
       - name: Set environment variables for iOS and handle APPLE_P8
         run: |
-            echo "Setting default environment variables"
+          echo "Setting environment variables for iOS"
+
+          if [ "$SIBOOK_RELEASE" = "true" ]; then
+            echo "🔵 Using SiBook Apple account"
+            echo "APPLE_ID=${{ secrets.APPLE_ID_SIBOOK }}" >> $GITHUB_ENV
+            echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID_SIBOOK }}" >> $GITHUB_ENV
+            echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID_SIBOOK }}" >> $GITHUB_ENV
+            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID_SIBOOK }}" >> $GITHUB_ENV
+            echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64_SIBOOK }}" >> $GITHUB_ENV
+            echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD_SIBOOK }}" >> $GITHUB_ENV
+            echo "APPLE_P8=${{ secrets.APPLE_P8_SIBOOK }}" >> $GITHUB_ENV
+          else
+            echo "🟢 Using Lorenzo Apple account"
             echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
             echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
             echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
@@ -37,6 +57,7 @@ jobs:
             echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64 }}" >> $GITHUB_ENV
             echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
             echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
+          fi
             
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -126,12 +147,13 @@ jobs:
           
       - name: Configure Fastlane API Key
         run: |
-          if [[ "$USE_LORENZO" == "true" ]]; then
-            echo "${{ secrets.LORENZO_APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
-          else
-            echo "${{ secrets.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
-          fi
-          jq -n --arg key_id "${{ env.APPLE_KEY_ID }}" --arg issuer_id "${{ env.APPLE_ISSUER_ID }}" --arg key "$(cat fastlane/AuthKey.p8)" --argjson in_house false \
+          mkdir -p fastlane
+          echo "$APPLE_P8" | base64 --decode > fastlane/AuthKey.p8
+          jq -n \
+            --arg key_id "$APPLE_KEY_ID" \
+            --arg issuer_id "$APPLE_ISSUER_ID" \
+            --arg key "$(cat fastlane/AuthKey.p8)" \
+            --argjson in_house false \
             '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
 
 
