@@ -425,6 +425,22 @@ jobs:
       - name: Build Android
         run: npm run build:android
 
+      - name: Upload .aab finale su Google Drive 📦
+        run: |
+          DEST="gdrive:screenshots-sibook/${{ env.APP_NAME }}_${{ env.APP_VERSION }}"
+          echo "Caricamento .aab finale su Drive in: $DEST"
+      
+          AAB_FILE=$(ls /home/runner/work/automation-build/automation-build/build-*.aab | head -n 1)
+      
+          if [ -f "$AAB_FILE" ]; then
+            echo "✅ File trovato: $AAB_FILE"
+            rclone copy "$AAB_FILE" "$DEST/app-release.aab"
+            echo "✅ .aab caricato con successo su Google Drive."
+          else
+            echo "❌ Nessun file .aab trovato!"
+            exit 1
+          fi
+
       # Aggiornamenti (APP_VERSION != 1.0.0): usa sempre la JSON key scelta sopra
       - name: Upload the update to the Play Store 🚀
         if: env.APP_VERSION != '1.0.0'
