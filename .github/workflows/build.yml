@@ -300,6 +300,20 @@ jobs:
           docker-images: false
           large-packages: false
 
+      - name: Install rclone
+        run: |
+          curl -O https://downloads.rclone.org/rclone-current-linux-amd64.zip
+          unzip rclone-current-linux-amd64.zip
+          cd rclone-*-linux-amd64
+          sudo cp rclone /usr/bin/rclone
+          sudo chmod 755 /usr/bin/rclone
+          rclone version
+      
+      - name: Configure rclone (base64)
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG_BASE64 }}" | base64 --decode > ~/.config/rclone/rclone.conf
+
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
         with:
