@@ -89,9 +89,44 @@ jobs:
             echo "clients=${{ steps.client.outputs.client_name }}" >> $GITHUB_OUTPUT
           fi
 
+      # Flag: se esiste sibook.txt => build per account SiBook
+      - name: Detect SiBook release flag
+        run: |
+          if [ -f "sibook.txt" ]; then
+            echo "SIBOOK_RELEASE=true" >> $GITHUB_ENV
+          else
+            echo "SIBOOK_RELEASE=false" >> $GITHUB_ENV
+          fi
+
+      # Sceglie le credenziali Play Store in base a SIBOOK_RELEASE
+      - name: Set environment variables for Android
+        run: |
+          if [ "$SIBOOK_RELEASE" = "true" ]; then
+            # Controllo di sicurezza: se manca il secret fallisce subito
+            if [ -z "${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64_SIBOOK }}" ]; then
+              echo "❌ Missing GOOGLE_PLAY_JSON_KEY_BASE64_SIBOOK while SIBOOK_RELEASE=true"
+              exit 1
+            fi
+
+            echo "Using SiBook Google Play account"
+            echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL_SIBOOK }}" >> $GITHUB_ENV
+            echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD_SIBOOK }}" >> $GITHUB_ENV
+            echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64_SIBOOK }}" >> $GITHUB_ENV
+          else
+            if [ -z "${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" ]; then
+              echo "❌ Missing GOOGLE_PLAY_JSON_KEY_BASE64"
+              exit 1
+            fi
+
+            echo "Using Lorenzo Google Play account"
+            echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
+            echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
+            echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
+          fi
+
       - name: Setup Android keystore from credentials.json
         run: |
-          # Leggi credentials.json se esiste
+          # Leggi credentials.json se esiste (opzionale, come in app-refactor)
           if [ -f "credentials.json" ]; then
             echo "📦 Usando credentials.json per keystore"
             KEYSTORE_PATH=$(node -e "const creds = require('./credentials.json'); console.log(creds.android?.keystore?.keystorePath || '')")
@@ -99,14 +134,29 @@ jobs:
             KEY_ALIAS=$(node -e "const creds = require('./credentials.json'); console.log(creds.android?.keystore?.keyAlias || '')")
             KEY_PASSWORD=$(node -e "const creds = require('./credentials.json'); console.log(creds.android?.keystore?.keyPassword || '')")
             
-            # Crea directory keystore se necessario
-            mkdir -p $(dirname "$KEYSTORE_PATH")
-            
-            echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> $GITHUB_ENV
-            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
-            echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
-            echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
-            echo "✅ Keystore configurato da credentials.json"
+            if [ -n "$KEYSTORE_PATH" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+              # Crea directory keystore se necessario
+              mkdir -p $(dirname "$KEYSTORE_PATH")
+              echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> $GITHUB_ENV
+              echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
+              echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
+              echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
+              echo "✅ Keystore configurato da credentials.json"
+            else
+              echo "⚠️  credentials.json presente ma dati keystore incompleti - usando GitHub Secrets"
+              mkdir -p fastlane/keystores
+              if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+                echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > fastlane/keystores/release.keystore
+                echo "KEYSTORE_PATH=./fastlane/keystores/release.keystore" >> $GITHUB_ENV
+                echo "KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+                echo "KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
+                echo "KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
+                echo "✅ Keystore configurato da GitHub Secrets"
+              else
+                echo "❌ Nessuna configurazione keystore trovata!"
+                exit 1
+              fi
+            fi
           else
             echo "⚠️  credentials.json non trovato - usando GitHub Secrets"
             mkdir -p fastlane/keystores
@@ -133,14 +183,9 @@ jobs:
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=./fastlane/google-play-service-account.json
           EOF
 
-      - name: Setup Google Play Service Account
+      - name: Decode and Create Google Play Json Key
         run: |
-          if [ -n "${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}" ]; then
-            echo "${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}" > fastlane/google-play-service-account.json
-            echo "✅ Google Play Service Account configurato"
-          else
-            echo "⚠️  GOOGLE_PLAY_SERVICE_ACCOUNT_JSON non configurato - l'upload potrebbe fallire"
-          fi
+          echo "${{ env.GOOGLE_PLAY_JSON_KEY_BASE64 }}" | base64 --decode > google_play_json_key.json
 
       - name: Install Fastlane
         run: |
@@ -160,10 +205,46 @@ jobs:
           for CLIENT in "${CLIENTS_ARRAY[@]}"; do
             echo "🚀 Building Android per: $CLIENT"
             
+            # Configura per il cliente (necessario per estrarre la versione)
+            node scripts/build-client.js $CLIENT --production
+            
+            # Estrai versione da android/app/build.gradle dopo la configurazione
+            APP_VERSION=$(grep -E "versionName\s+" android/app/build.gradle | sed -E 's/.*versionName\s+"([^"]+)".*/\1/' || echo "1.0.0")
+            ANDROID_PACKAGE=$(grep -E "applicationId\s+" android/app/build.gradle | sed -E 's/.*applicationId\s+"([^"]+)".*/\1/' || echo "")
+            APP_NAME=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients['$CLIENT']?.appName || '')")
+            
+            echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+            echo "ANDROID_PACKAGE=$ANDROID_PACKAGE" >> $GITHUB_ENV
+            echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+            echo "📦 Versione app: $APP_VERSION"
+            echo "📱 Package: $ANDROID_PACKAGE"
+            
             if [ "$BUILD_ONLY" == "true" ]; then
               fastlane android build client:$CLIENT
             else
               fastlane android release client:$CLIENT deploy_vps:$DEPLOY_VPS
+            fi
+            
+            # Se è la prima release (1.0.0), chiama il repository di automazione
+            if [ "$APP_VERSION" == "1.0.0" ] && [ "$BUILD_ONLY" != "true" ]; then
+              echo "🆕 Prima release (1.0.0) - chiamando repository di automazione"
+              
+              # Checkout Easybook Automation Repository usando git clone con token
+              git clone https://${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}@github.com/lorenzomalla/easybook-release-automation-android.git easybook-release-automation-android || true
+              cd easybook-release-automation-android
+              npm ci
+              
+              # Se SIBOOK_RELEASE = true, usa lo script dedicato
+              if [ "$SIBOOK_RELEASE" == "true" ]; then
+                GOOGLE_PLAY_EMAIL="${{ env.GOOGLE_PLAY_EMAIL }}" GOOGLE_PLAY_PASSWORD="${{ env.GOOGLE_PLAY_PASSWORD }}" npm run release:sibook
+              else
+                GOOGLE_PLAY_EMAIL="${{ env.GOOGLE_PLAY_EMAIL }}" GOOGLE_PLAY_PASSWORD="${{ env.GOOGLE_PLAY_PASSWORD }}" npm run start
+              fi
+              
+              cd ..
+            elif [ "$APP_VERSION" != "1.0.0" ] && [ "$BUILD_ONLY" != "true" ]; then
+              echo "🔄 Aggiornamento ($APP_VERSION) - upload tramite Fastlane"
+              # L'upload è già gestito da fastlane android release
             fi
             
             echo "✅ Build completata per: $CLIENT"
