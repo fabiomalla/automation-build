@@ -263,9 +263,19 @@ jobs:
               
               # Se SIBOOK_RELEASE = true, usa lo script dedicato
               if [ "$SIBOOK_RELEASE" == "true" ]; then
-                GOOGLE_PLAY_EMAIL="${{ env.GOOGLE_PLAY_EMAIL }}" GOOGLE_PLAY_PASSWORD="${{ env.GOOGLE_PLAY_PASSWORD }}" npm run release:sibook
+                export GOOGLE_PLAY_EMAIL="${{ env.GOOGLE_PLAY_EMAIL }}"
+                export GOOGLE_PLAY_PASSWORD="${{ env.GOOGLE_PLAY_PASSWORD }}"
+                export APP_NAME="$APP_NAME"
+                export APP_BUNDLE_IDENTIFIER="$ANDROID_PACKAGE"
+                export APP_VERSION="$APP_VERSION"
+                npm run release:sibook
               else
-                GOOGLE_PLAY_EMAIL="${{ env.GOOGLE_PLAY_EMAIL }}" GOOGLE_PLAY_PASSWORD="${{ env.GOOGLE_PLAY_PASSWORD }}" npm run start
+                export GOOGLE_PLAY_EMAIL="${{ env.GOOGLE_PLAY_EMAIL }}"
+                export GOOGLE_PLAY_PASSWORD="${{ env.GOOGLE_PLAY_PASSWORD }}"
+                export APP_NAME="$APP_NAME"
+                export APP_BUNDLE_IDENTIFIER="$ANDROID_PACKAGE"
+                export APP_VERSION="$APP_VERSION"
+                npm run start
               fi
               
               cd ..
