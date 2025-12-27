@@ -244,15 +244,17 @@ jobs:
             echo "📦 Versione app: $APP_VERSION"
             echo "📱 Package: $ANDROID_PACKAGE"
             
+            # Gestione build e upload in base alla versione
             if [ "$BUILD_ONLY" == "true" ]; then
+              # Solo build, senza upload
               fastlane android build client:$CLIENT
-            else
-              fastlane android release client:$CLIENT deploy_vps:$DEPLOY_VPS
-            fi
-            
-            # Se è la prima release (1.0.0), chiama il repository di automazione
-            if [ "$APP_VERSION" == "1.0.0" ] && [ "$BUILD_ONLY" != "true" ]; then
-              echo "🆕 Prima release (1.0.0) - chiamando repository di automazione"
+            elif [ "$APP_VERSION" == "1.0.0" ]; then
+              # Prima release: solo build, l'upload sarà gestito dal repository di automazione
+              echo "🆕 Prima release (1.0.0) - build completato, upload gestito da repository di automazione"
+              fastlane android build client:$CLIENT
+              
+              # Chiama il repository di automazione per creare l'app
+              echo "🆕 Chiamando repository di automazione per creare app su Play Store"
               
               # Checkout Easybook Automation Repository usando git clone con token
               git clone https://${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}@github.com/lorenzomalla/easybook-release-automation-android.git easybook-release-automation-android || true
@@ -267,9 +269,12 @@ jobs:
               fi
               
               cd ..
-            elif [ "$APP_VERSION" != "1.0.0" ] && [ "$BUILD_ONLY" != "true" ]; then
+            else
+              # Aggiornamenti: usa Fastlane con JSON key per upload
               echo "🔄 Aggiornamento ($APP_VERSION) - upload tramite Fastlane"
-              # L'upload è già gestito da fastlane android release
+              export ANDROID_PACKAGE_NAME="$ANDROID_PACKAGE"
+              export GOOGLE_PLAY_JSON_KEY="google_play_json_key.json"
+              fastlane android release client:$CLIENT deploy_vps:$DEPLOY_VPS
             fi
             
             echo "✅ Build completata per: $CLIENT"
