@@ -58,6 +58,39 @@ jobs:
           rm -rf node_modules package-lock.json
           npm install
 
+      # Flag: se esiste sibook.txt => build per account SiBook
+      - name: Detect SiBook release flag
+        run: |
+          if [ -f "sibook.txt" ]; then
+            echo "SIBOOK_RELEASE=true" >> $GITHUB_ENV
+          else
+            echo "SIBOOK_RELEASE=false" >> $GITHUB_ENV
+          fi
+
+      - name: Set environment variables for iOS and handle APPLE_P8
+        run: |
+          echo "Setting environment variables for iOS"
+
+          if [ "$SIBOOK_RELEASE" = "true" ]; then
+            echo "🔵 Using SiBook Apple account"
+            echo "APPLE_ID=${{ secrets.APPLE_ID_SIBOOK }}" >> $GITHUB_ENV
+            echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID_SIBOOK }}" >> $GITHUB_ENV
+            echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID_SIBOOK }}" >> $GITHUB_ENV
+            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID_SIBOOK }}" >> $GITHUB_ENV
+            echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64_SIBOOK }}" >> $GITHUB_ENV
+            echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD_SIBOOK }}" >> $GITHUB_ENV
+            echo "APPLE_P8=${{ secrets.APPLE_P8_SIBOOK }}" >> $GITHUB_ENV
+          else
+            echo "🟢 Using Lorenzo Apple account"
+            echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
+            echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
+            echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
+            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+            echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64 }}" >> $GITHUB_ENV
+            echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
+            echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
+          fi
+
       - name: Install CocoaPods dependencies
         run: |
           cd ios/App
@@ -88,53 +121,137 @@ jobs:
             echo "clients=${{ steps.client.outputs.client_name }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Setup App Store Connect API Key
+      - name: Create Keychain
+        run: |
+          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+
+      - name: Decode and Create Certificate and Provisioning Profile
+        run: |
+          echo "${{ env.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
+          security import certificate.p12 -P "${{ env.CERT_P12_PASSWORD }}" -A -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+
+      - name: Configure Fastlane API Key
         run: |
           mkdir -p fastlane
-          if [ -n "${{ secrets.APP_STORE_CONNECT_API_KEY }}" ] && [ -n "${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}" ]; then
-            echo "${{ secrets.APP_STORE_CONNECT_API_KEY }}" | base64 --decode > fastlane/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
-            echo "✅ App Store Connect API Key configurata"
-          else
-            echo "⚠️  APP_STORE_CONNECT_API_KEY non configurato - la build potrebbe fallire"
-          fi
+          echo "${{ env.APPLE_P8 }}" | base64 --decode > fastlane/AuthKey.p8
+          jq -n \
+            --arg key_id "${{ env.APPLE_KEY_ID }}" \
+            --arg issuer_id "${{ env.APPLE_ISSUER_ID }}" \
+            --arg key "$(cat fastlane/AuthKey.p8)" \
+            --argjson in_house false \
+            '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
 
       - name: Create .env.ios
         run: |
           cat > .env.ios << EOF
-          APP_STORE_CONNECT_API_KEY_ID=${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID=${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY_PATH=./fastlane/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
-          FASTLANE_USER=${{ secrets.FASTLANE_USER }}
+          APP_STORE_CONNECT_API_KEY_ID=${{ env.APPLE_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID=${{ env.APPLE_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH=./fastlane/AuthKey.p8
+          FASTLANE_USER=${{ env.APPLE_ID }}
           FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD=${{ secrets.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD }}
-          FASTLANE_ITC_TEAM_ID=${{ secrets.FASTLANE_ITC_TEAM_ID }}
-          FASTLANE_TEAM_ID=${{ secrets.FASTLANE_TEAM_ID }}
+          FASTLANE_ITC_TEAM_ID=${{ env.APPLE_TEAM_ID }}
+          FASTLANE_TEAM_ID=${{ env.APPLE_TEAM_ID }}
           EOF
 
-      - name: Setup Fastlane session (if available)
-        if: ${{ secrets.FASTLANE_SESSION != '' }}
+      - name: Install Fastlane on macOS (user install)
         run: |
-          echo "${{ secrets.FASTLANE_SESSION }}" > fastlane_session.txt
+          echo 'export GEM_HOME=$HOME/.gem' >> $GITHUB_ENV
+          echo 'export PATH=$HOME/.gem/bin:$PATH' >> $GITHUB_ENV
+          gem install --user-install fastlane -NV
 
-      - name: Install Fastlane
+      - name: Install jq
         run: |
-          sudo gem install fastlane
-          sudo gem install bundler
-
-      - name: Setup match (if using match)
-        if: ${{ secrets.MATCH_PASSWORD != '' }}
-        run: |
-          fastlane match appstore --readonly || true
+          if ! command -v jq &> /dev/null; then
+            brew install jq
+          else
+            echo "jq is already installed"
+          fi
 
       - name: Build for each client
         env:
           CLIENT_NAME: ${{ steps.client.outputs.client_name }}
           BUILD_ONLY: ${{ github.event.inputs.build_only || github.event.client_payload.build_only || 'false' }}
           DEPLOY_VPS: ${{ github.event.inputs.deploy_vps || github.event.client_payload.deploy_vps || 'true' }}
-          FASTLANE_SESSION: ${{ secrets.FASTLANE_SESSION }}
+          APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
+          APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
+          APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
         run: |
           IFS=',' read -ra CLIENTS_ARRAY <<< "${{ steps.clients.outputs.clients }}"
           for CLIENT in "${CLIENTS_ARRAY[@]}"; do
             echo "🚀 Building iOS per: $CLIENT"
+            
+            # Configura per il cliente (necessario per estrarre info)
+            node scripts/build-client.js $CLIENT --production
+            
+            # Estrai info dal progetto iOS dopo la configurazione
+            # Per iOS, la versione è in ios/App/App.xcodeproj/project.pbxproj o Info.plist
+            # Per semplicità, usiamo la versione da package.json o assumiamo 1.0.0 se non trovata
+            APP_VERSION=$(grep -E '"version"' package.json | head -1 | sed -E 's/.*"version":\s*"([^"]+)".*/\1/' || echo "1.0.0")
+            BUNDLE_ID=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients['$CLIENT']?.appId || '')")
+            APP_NAME=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients['$CLIENT']?.appName || '')")
+            
+            echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+            echo "BUNDLE_ID=$BUNDLE_ID" >> $GITHUB_ENV
+            echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+            echo "📦 Versione app: $APP_VERSION"
+            echo "📱 Bundle ID: $BUNDLE_ID"
+            
+            # Estrai e trasforma nome app per bundle target (come in build.yml)
+            NAME="$APP_NAME"
+            BUNDLE_TARGET=$(echo "$NAME" | node -e "
+              const name = require('fs').readFileSync(0, 'utf-8').trim();
+              const normalized = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+              const bundleTarget = normalized.replace(/[^0-9A-Za-z]/g, '').slice(0, 60) || 'IonicApp';
+              console.log(bundleTarget);
+            ")
+            EXTENSION_BUNDLE_ID="${BUNDLE_ID}.OneSignalNotificationServiceExtension"
+            
+            echo "BUNDLE_TARGET=$BUNDLE_TARGET" >> $GITHUB_ENV
+            echo "EXTENSION_BUNDLE_ID=$EXTENSION_BUNDLE_ID" >> $GITHUB_ENV
+            
+            # Run Fastlane Create App (crea app e provisioning profiles)
+            if [ "$APP_VERSION" == "1.0.0" ] && [ "$BUILD_ONLY" != "true" ]; then
+              echo "🆕 Prima release (1.0.0) - creando app su App Store Connect"
+              export AUTH_KEY_PATH="fastlane/AuthKey.p8"
+              export APPLE_ID="${{ env.APPLE_ID }}"
+              export APPLE_KEY_ID="${{ env.APPLE_KEY_ID }}"
+              export APPLE_ISSUER_ID="${{ env.APPLE_ISSUER_ID }}"
+              export BUNDLE_ID="$BUNDLE_ID"
+              export EXTENSION_BUNDLE_ID="$EXTENSION_BUNDLE_ID"
+              export APP_NAME="$APP_NAME"
+              fastlane create_app
+              echo "✅ App e provisioning profiles creati su App Store Connect"
+            fi
+            
+            # Crea credentials.json per iOS (come in build.yml)
+            echo "{
+              \"ios\": {
+                \"OneSignalNotificationServiceExtension\": {
+                  \"distributionCertificate\": {
+                    \"path\": \"certificate.p12\",
+                    \"password\": \"${{ env.CERT_P12_PASSWORD }}\"
+                  },
+                  \"provisioningProfilePath\": \"provisioning_profile_onesignal.mobileprovision\"
+                },
+                \"${BUNDLE_TARGET}\": {
+                  \"distributionCertificate\": {
+                    \"path\": \"certificate.p12\",
+                    \"password\": \"${{ env.CERT_P12_PASSWORD }}\"
+                  },
+                  \"provisioningProfilePath\": \"provisioning_profile.mobileprovision\"
+                }
+              }
+            }" > ./credentials.json
+            
+            # Build iOS con variabili d'ambiente
+            export EXPO_APPLE_TEAM_ID="${{ env.APPLE_TEAM_ID }}"
+            export EXPO_APPLE_KEY_ID="${{ env.APPLE_KEY_ID }}"
+            export EXPO_APPLE_ISSUER_ID="${{ env.APPLE_ISSUER_ID }}"
+            export EXPO_APPLE_API_KEY_PATH="fastlane/AuthKey.p8"
             
             if [ "$BUILD_ONLY" == "true" ]; then
               fastlane ios build client:$CLIENT
