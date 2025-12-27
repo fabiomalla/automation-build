@@ -154,12 +154,15 @@ jobs:
             mkdir -p fastlane/keystores
             if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
               echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > fastlane/keystores/release.keystore
-              echo "KEYSTORE_PATH=./fastlane/keystores/release.keystore" >> $GITHUB_ENV
+              # Usa path assoluto per evitare problemi con project_dir in Gradle
+              KEYSTORE_ABS_PATH=$(pwd)/fastlane/keystores/release.keystore
+              echo "KEYSTORE_PATH=$KEYSTORE_ABS_PATH" >> $GITHUB_ENV
               echo "KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
               echo "KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
               echo "KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
               KEYSTORE_CONFIGURED=true
               echo "✅ Keystore configurato da GitHub Secrets"
+              echo "📁 Path keystore: $KEYSTORE_ABS_PATH"
             else
               echo "⚠️  GitHub Secrets non configurati"
             fi
