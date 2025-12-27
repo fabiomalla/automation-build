@@ -122,6 +122,8 @@ jobs:
       - name: Setup Android keystore from credentials.json
         id: keystore_setup
         run: |
+          KEYSTORE_CONFIGURED=false
+          
           # Leggi credentials.json se esiste (opzionale, come in app-refactor)
           if [ -f "credentials.json" ]; then
             echo "📦 Usando credentials.json per keystore"
@@ -137,19 +139,17 @@ jobs:
               echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
               echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
               echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
-              echo "keystore_configured=true" >> $GITHUB_OUTPUT
+              KEYSTORE_CONFIGURED=true
               echo "✅ Keystore configurato da credentials.json"
             else
               echo "⚠️  credentials.json presente ma dati keystore incompleti"
-              echo "keystore_configured=false" >> $GITHUB_OUTPUT
             fi
           else
             echo "⚠️  credentials.json non trovato"
-            echo "keystore_configured=false" >> $GITHUB_OUTPUT
           fi
           
           # Se credentials.json non ha funzionato, prova GitHub Secrets
-          if [ "${{ steps.keystore_setup.outputs.keystore_configured }}" != "true" ]; then
+          if [ "$KEYSTORE_CONFIGURED" != "true" ]; then
             echo "📦 Tentativo con GitHub Secrets..."
             mkdir -p fastlane/keystores
             if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
@@ -158,16 +158,15 @@ jobs:
               echo "KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
               echo "KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
               echo "KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
-              echo "keystore_configured=true" >> $GITHUB_OUTPUT
+              KEYSTORE_CONFIGURED=true
               echo "✅ Keystore configurato da GitHub Secrets"
             else
               echo "⚠️  GitHub Secrets non configurati"
-              echo "keystore_configured=false" >> $GITHUB_OUTPUT
             fi
           fi
           
           # Se ancora non configurato, verifica se è build_only
-          if [ "${{ steps.keystore_setup.outputs.keystore_configured }}" != "true" ]; then
+          if [ "$KEYSTORE_CONFIGURED" != "true" ]; then
             BUILD_ONLY="${{ github.event.inputs.build_only || github.event.client_payload.build_only || 'false' }}"
             if [ "$BUILD_ONLY" == "true" ]; then
               echo "⚠️  Keystore non configurato ma build_only=true - continuo senza keystore (build non firmato)"
@@ -184,6 +183,8 @@ jobs:
               exit 1
             fi
           fi
+          
+          echo "keystore_configured=$KEYSTORE_CONFIGURED" >> $GITHUB_OUTPUT
 
       - name: Create .env.android
         run: |
