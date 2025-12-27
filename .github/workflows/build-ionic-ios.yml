@@ -209,9 +209,29 @@ jobs:
             # Setup Nginx se richiesto (prima del deploy)
             if [ "$SETUP_NGINX" == "true" ]; then
               echo "🔧 Configurazione Nginx per: $CLIENT"
+              
+              # Genera la configurazione Nginx e lo script bash
               node scripts/setup-nginx-client.js $CLIENT
-              echo "✅ Configurazione Nginx generata"
-              echo "📋 Istruzioni per configurare Nginx sulla VPS sono state generate in nginx-configs/"
+              
+              # Estrai info VPS da clients.config.json
+              VPS_PATH=$(node -e "const c=require('./clients.config.json');console.log(c.clients?.['$CLIENT']?.vpsPath||'/var/www/app-$CLIENT')")
+              echo "VPS_PATH_${CLIENT}=$VPS_PATH" >> $GITHUB_ENV
+              
+              echo "📋 Info VPS:"
+              echo "   Path: $VPS_PATH"
+              
+              # Verifica che i file siano stati generati
+              NGINX_CONFIG_FILE="nginx-configs/${CLIENT}.conf"
+              NGINX_SCRIPT_FILE="nginx-configs/setup-${CLIENT}.sh"
+              
+              if [ -f "$NGINX_CONFIG_FILE" ] && [ -f "$NGINX_SCRIPT_FILE" ]; then
+                echo "✅ Configurazione Nginx generata"
+                echo "   Config: $NGINX_CONFIG_FILE"
+                echo "   Script: $NGINX_SCRIPT_FILE"
+                echo "📋 I file sono pronti per essere applicati sulla VPS"
+              else
+                echo "❌ File configurazione Nginx non trovati"
+              fi
             fi
             
             # Estrai e trasforma nome app per bundle target (come in build.yml)
@@ -275,6 +295,74 @@ jobs:
             
             echo "✅ Build completata per: $CLIENT"
           done
+
+      - name: Copy Nginx configuration to VPS
+        if: ${{ github.event.inputs.setup_nginx == 'true' || github.event.client_payload.setup_nginx == 'true' }}
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SECRET_KEY }}
+          source: "nginx-configs/*"
+          target: "/tmp/"
+
+      - name: Extract VPS paths for Nginx setup
+        if: ${{ github.event.inputs.setup_nginx == 'true' || github.event.client_payload.setup_nginx == 'true' }}
+        id: vps_paths
+        run: |
+          IFS=',' read -ra CLIENTS_ARRAY <<< "${{ steps.clients.outputs.clients }}"
+          VPS_PATHS=""
+          for CLIENT in "${CLIENTS_ARRAY[@]}"; do
+            VPS_PATH=$(node -e "const c=require('./clients.config.json');console.log(c.clients?.['$CLIENT']?.vpsPath||'/var/www/app-$CLIENT')")
+            VPS_PATHS="${VPS_PATHS}${CLIENT}:${VPS_PATH} "
+          done
+          echo "paths=${VPS_PATHS}" >> $GITHUB_OUTPUT
+
+      - name: Apply Nginx configuration on VPS
+        if: ${{ github.event.inputs.setup_nginx == 'true' || github.event.client_payload.setup_nginx == 'true' }}
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SECRET_KEY }}
+          script: |
+            # Estrai info dal client
+            CLIENT="${{ steps.client.outputs.client_name }}"
+            
+            # Estrai VPS_PATH dalla lista generata
+            VPS_PATHS="${{ steps.vps_paths.outputs.paths }}"
+            VPS_PATH=$(echo "$VPS_PATHS" | grep -o "${CLIENT}:[^ ]*" | cut -d: -f2)
+            VPS_PATH="${VPS_PATH:-/var/www/app-${CLIENT}}"
+            
+            echo "🔧 Applicazione configurazione Nginx per: $CLIENT"
+            echo "   Path: $VPS_PATH"
+            
+            # Crea directory
+            mkdir -p $VPS_PATH
+            chown -R www-data:www-data $VPS_PATH
+            chmod -R 755 $VPS_PATH
+            
+            # Applica configurazione Nginx se presente
+            if [ -f "/tmp/${CLIENT}.conf" ]; then
+              # Copia configurazione Nginx
+              sudo cp /tmp/${CLIENT}.conf /etc/nginx/sites-available/${CLIENT}
+              
+              # Abilita il sito
+              sudo ln -sf /etc/nginx/sites-available/${CLIENT} /etc/nginx/sites-enabled/
+              sudo rm -f /etc/nginx/sites-enabled/default
+              
+              # Testa e riavvia Nginx
+              if sudo nginx -t; then
+                sudo systemctl restart nginx
+                echo "✅ Configurazione Nginx applicata e Nginx riavviato"
+              else
+                echo "❌ Errore nella configurazione Nginx!"
+                exit 1
+              fi
+            else
+              echo "⚠️  File configurazione Nginx non trovato: /tmp/${CLIENT}.conf"
+              echo "📋 Applica manualmente usando lo script bash generato"
+            fi
 
       - name: Upload build artifacts
         if: always()
