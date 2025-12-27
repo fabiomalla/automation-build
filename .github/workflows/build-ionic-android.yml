@@ -1,0 +1,190 @@
+run-name: Build Ionic Android - ${{ github.event.inputs.client_name || 'all' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      client_name:
+        description: "Nome del cliente da buildare (es: napoli, sibook-tattoo)"
+        required: true
+        type: string
+      branch:
+        description: "Branch del repository privato da buildare"
+        required: false
+        default: "main"
+        type: string
+      build_only:
+        description: "Solo build senza upload (default: false)"
+        required: false
+        default: false
+        type: boolean
+      deploy_vps:
+        description: "Deploy su VPS dopo build (default: true)"
+        required: false
+        default: true
+        type: boolean
+  repository_dispatch:
+    types: [build-ionic-android]
+
+env:
+  NODE_VERSION: '22.21.1'
+  JAVA_VERSION: '21'
+
+jobs:
+  build_android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete unnecessary tools 🔧
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: false
+          tool-cache: true
+          dotnet: true
+          haskell: true
+          swap-storage: true
+
+      - name: Checkout the Private Repository
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ secrets.IONIC_REPO_OWNER }}/${{ secrets.IONIC_REPO_NAME }}
+          token: ${{ secrets.IONIC_REPO_TOKEN }}
+          ref: ${{ github.event.inputs.branch || github.event.client_payload.branch || 'main' }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Determine client name
+        id: client
+        run: |
+          if [ -n "${{ github.event.inputs.client_name }}" ]; then
+            CLIENT_NAME="${{ github.event.inputs.client_name }}"
+          elif [ -n "${{ github.event.client_payload.client_name }}" ]; then
+            CLIENT_NAME="${{ github.event.client_payload.client_name }}"
+          else
+            CLIENT_NAME="all"
+          fi
+          echo "client_name=$CLIENT_NAME" >> $GITHUB_OUTPUT
+          echo "🔍 Client da buildare: $CLIENT_NAME"
+
+      - name: Get clients list
+        id: clients
+        run: |
+          if [ "${{ steps.client.outputs.client_name }}" == "all" ]; then
+            CLIENTS=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(Object.keys(config.clients).join(','))")
+            echo "clients=$CLIENTS" >> $GITHUB_OUTPUT
+            echo "📦 Clienti trovati: $CLIENTS"
+          else
+            echo "clients=${{ steps.client.outputs.client_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Android keystore from credentials.json
+        run: |
+          # Leggi credentials.json se esiste
+          if [ -f "credentials.json" ]; then
+            echo "📦 Usando credentials.json per keystore"
+            KEYSTORE_PATH=$(node -e "const creds = require('./credentials.json'); console.log(creds.android?.keystore?.keystorePath || '')")
+            KEYSTORE_PASSWORD=$(node -e "const creds = require('./credentials.json'); console.log(creds.android?.keystore?.keystorePassword || '')")
+            KEY_ALIAS=$(node -e "const creds = require('./credentials.json'); console.log(creds.android?.keystore?.keyAlias || '')")
+            KEY_PASSWORD=$(node -e "const creds = require('./credentials.json'); console.log(creds.android?.keystore?.keyPassword || '')")
+            
+            # Crea directory keystore se necessario
+            mkdir -p $(dirname "$KEYSTORE_PATH")
+            
+            echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> $GITHUB_ENV
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
+            echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
+            echo "✅ Keystore configurato da credentials.json"
+          else
+            echo "⚠️  credentials.json non trovato - usando GitHub Secrets"
+            mkdir -p fastlane/keystores
+            if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+              echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > fastlane/keystores/release.keystore
+              echo "KEYSTORE_PATH=./fastlane/keystores/release.keystore" >> $GITHUB_ENV
+              echo "KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+              echo "KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
+              echo "KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
+              echo "✅ Keystore configurato da GitHub Secrets"
+            else
+              echo "❌ Nessuna configurazione keystore trovata!"
+              exit 1
+            fi
+          fi
+
+      - name: Create .env.android
+        run: |
+          cat > .env.android << EOF
+          KEYSTORE_PATH=${KEYSTORE_PATH}
+          KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}
+          KEY_ALIAS=${KEY_ALIAS}
+          KEY_PASSWORD=${KEY_PASSWORD}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=./fastlane/google-play-service-account.json
+          EOF
+
+      - name: Setup Google Play Service Account
+        run: |
+          if [ -n "${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}" ]; then
+            echo "${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}" > fastlane/google-play-service-account.json
+            echo "✅ Google Play Service Account configurato"
+          else
+            echo "⚠️  GOOGLE_PLAY_SERVICE_ACCOUNT_JSON non configurato - l'upload potrebbe fallire"
+          fi
+
+      - name: Install Fastlane
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby-full
+          echo 'export GEM_HOME=$HOME/.gem' >> $GITHUB_ENV
+          echo 'export PATH=$HOME/.gem/bin:$PATH' >> $GITHUB_ENV
+          gem install --user-install fastlane -NV
+
+      - name: Build for each client
+        env:
+          CLIENT_NAME: ${{ steps.client.outputs.client_name }}
+          BUILD_ONLY: ${{ github.event.inputs.build_only || github.event.client_payload.build_only || 'false' }}
+          DEPLOY_VPS: ${{ github.event.inputs.deploy_vps || github.event.client_payload.deploy_vps || 'true' }}
+        run: |
+          IFS=',' read -ra CLIENTS_ARRAY <<< "${{ steps.clients.outputs.clients }}"
+          for CLIENT in "${CLIENTS_ARRAY[@]}"; do
+            echo "🚀 Building Android per: $CLIENT"
+            
+            if [ "$BUILD_ONLY" == "true" ]; then
+              fastlane android build client:$CLIENT
+            else
+              fastlane android release client:$CLIENT deploy_vps:$DEPLOY_VPS
+            fi
+            
+            echo "✅ Build completata per: $CLIENT"
+          done
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-builds
+          path: |
+            build/android/**
+          retention-days: 30
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## ✅ Build Android Completata" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Client buildati:** ${{ steps.clients.outputs.clients }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build only:** ${{ github.event.inputs.build_only || github.event.client_payload.build_only || 'false' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Gli artifact sono disponibili nella sezione Artifacts di questo workflow." >> $GITHUB_STEP_SUMMARY
+

@@ -1,0 +1,163 @@
+run-name: Build Ionic iOS - ${{ github.event.inputs.client_name || 'all' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      client_name:
+        description: "Nome del cliente da buildare (es: napoli, sibook-tattoo)"
+        required: true
+        type: string
+      branch:
+        description: "Branch del repository privato da buildare"
+        required: false
+        default: "main"
+        type: string
+      build_only:
+        description: "Solo build senza upload (default: false)"
+        required: false
+        default: false
+        type: boolean
+      deploy_vps:
+        description: "Deploy su VPS dopo build (default: true)"
+        required: false
+        default: true
+        type: boolean
+  repository_dispatch:
+    types: [build-ionic-ios]
+
+env:
+  NODE_VERSION: '22.21.1'
+  XCODE_VERSION: '15.4'
+
+jobs:
+  build_ios:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout the Private Repository
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ secrets.IONIC_REPO_OWNER }}/${{ secrets.IONIC_REPO_NAME }}
+          token: ${{ secrets.IONIC_REPO_TOKEN }}
+          ref: ${{ github.event.inputs.branch || github.event.client_payload.branch || 'main' }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install CocoaPods dependencies
+        run: |
+          cd ios/App
+          pod install
+          cd ../..
+
+      - name: Determine client name
+        id: client
+        run: |
+          if [ -n "${{ github.event.inputs.client_name }}" ]; then
+            CLIENT_NAME="${{ github.event.inputs.client_name }}"
+          elif [ -n "${{ github.event.client_payload.client_name }}" ]; then
+            CLIENT_NAME="${{ github.event.client_payload.client_name }}"
+          else
+            CLIENT_NAME="all"
+          fi
+          echo "client_name=$CLIENT_NAME" >> $GITHUB_OUTPUT
+          echo "🔍 Client da buildare: $CLIENT_NAME"
+
+      - name: Get clients list
+        id: clients
+        run: |
+          if [ "${{ steps.client.outputs.client_name }}" == "all" ]; then
+            CLIENTS=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(Object.keys(config.clients).join(','))")
+            echo "clients=$CLIENTS" >> $GITHUB_OUTPUT
+            echo "📦 Clienti trovati: $CLIENTS"
+          else
+            echo "clients=${{ steps.client.outputs.client_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup App Store Connect API Key
+        run: |
+          mkdir -p fastlane
+          if [ -n "${{ secrets.APP_STORE_CONNECT_API_KEY }}" ] && [ -n "${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}" ]; then
+            echo "${{ secrets.APP_STORE_CONNECT_API_KEY }}" | base64 --decode > fastlane/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
+            echo "✅ App Store Connect API Key configurata"
+          else
+            echo "⚠️  APP_STORE_CONNECT_API_KEY non configurato - la build potrebbe fallire"
+          fi
+
+      - name: Create .env.ios
+        run: |
+          cat > .env.ios << EOF
+          APP_STORE_CONNECT_API_KEY_ID=${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID=${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_PATH=./fastlane/AuthKey_${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}.p8
+          FASTLANE_USER=${{ secrets.FASTLANE_USER }}
+          FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD=${{ secrets.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD }}
+          FASTLANE_ITC_TEAM_ID=${{ secrets.FASTLANE_ITC_TEAM_ID }}
+          FASTLANE_TEAM_ID=${{ secrets.FASTLANE_TEAM_ID }}
+          EOF
+
+      - name: Setup Fastlane session (if available)
+        if: ${{ secrets.FASTLANE_SESSION != '' }}
+        run: |
+          echo "${{ secrets.FASTLANE_SESSION }}" > fastlane_session.txt
+
+      - name: Install Fastlane
+        run: |
+          sudo gem install fastlane
+          sudo gem install bundler
+
+      - name: Setup match (if using match)
+        if: ${{ secrets.MATCH_PASSWORD != '' }}
+        run: |
+          fastlane match appstore --readonly || true
+
+      - name: Build for each client
+        env:
+          CLIENT_NAME: ${{ steps.client.outputs.client_name }}
+          BUILD_ONLY: ${{ github.event.inputs.build_only || github.event.client_payload.build_only || 'false' }}
+          DEPLOY_VPS: ${{ github.event.inputs.deploy_vps || github.event.client_payload.deploy_vps || 'true' }}
+          FASTLANE_SESSION: ${{ secrets.FASTLANE_SESSION }}
+        run: |
+          IFS=',' read -ra CLIENTS_ARRAY <<< "${{ steps.clients.outputs.clients }}"
+          for CLIENT in "${CLIENTS_ARRAY[@]}"; do
+            echo "🚀 Building iOS per: $CLIENT"
+            
+            if [ "$BUILD_ONLY" == "true" ]; then
+              fastlane ios build client:$CLIENT
+            else
+              fastlane ios release client:$CLIENT deploy_vps:$DEPLOY_VPS
+            fi
+            
+            echo "✅ Build completata per: $CLIENT"
+          done
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-builds
+          path: |
+            build/ios/**
+          retention-days: 30
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## ✅ Build iOS Completata" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Client buildati:** ${{ steps.clients.outputs.clients }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build only:** ${{ github.event.inputs.build_only || github.event.client_payload.build_only || 'false' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Gli artifact sono disponibili nella sezione Artifacts di questo workflow." >> $GITHUB_STEP_SUMMARY
+
