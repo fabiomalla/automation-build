@@ -103,7 +103,7 @@ jobs:
               exit 1
             fi
 
-            echo "Using SiBook Google Play account"
+            echo "🔵 Using SiBook Google Play account"
             echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL_SIBOOK }}" >> $GITHUB_ENV
             echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD_SIBOOK }}" >> $GITHUB_ENV
             echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64_SIBOOK }}" >> $GITHUB_ENV
@@ -113,7 +113,7 @@ jobs:
               exit 1
             fi
 
-            echo "Using Lorenzo Google Play account"
+            echo "🟢 Using Lorenzo Google Play account"
             echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
             echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
             echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
@@ -272,6 +272,7 @@ jobs:
             else
               # Aggiornamenti: usa Fastlane con JSON key per upload
               echo "🔄 Aggiornamento ($APP_VERSION) - upload tramite Fastlane"
+              # Passa le variabili d'ambiente necessarie per l'upload (come in build.yml)
               export ANDROID_PACKAGE_NAME="$ANDROID_PACKAGE"
               export GOOGLE_PLAY_JSON_KEY="google_play_json_key.json"
               fastlane android release client:$CLIENT deploy_vps:$DEPLOY_VPS
