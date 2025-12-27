@@ -37,8 +37,8 @@ jobs:
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
         with:
-          repository: ${{ secrets.IONIC_REPO_OWNER }}/${{ secrets.IONIC_REPO_NAME }}
-          token: ${{ secrets.IONIC_REPO_TOKEN }}
+          repository: lorenzomalla/sibook-app-ionic
+          token: ${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}
           ref: ${{ github.event.inputs.branch || github.event.client_payload.branch || 'main' }}
 
       - name: Set up Node.js
