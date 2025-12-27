@@ -53,7 +53,10 @@ jobs:
           xcode-version: ${{ env.XCODE_VERSION }}
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          # Rimuovi package-lock.json e node_modules per evitare bug npm con dipendenze opzionali
+          rm -rf node_modules package-lock.json
+          npm install
 
       - name: Install CocoaPods dependencies
         run: |

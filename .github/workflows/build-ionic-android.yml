@@ -34,14 +34,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Delete unnecessary tools 🔧
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          android: false
-          tool-cache: true
-          dotnet: true
-          haskell: true
-          swap-storage: true
 
       - name: Checkout the Private Repository
         uses: actions/checkout@v3
@@ -63,7 +55,10 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          # Rimuovi package-lock.json e node_modules per evitare bug npm con dipendenze opzionali
+          rm -rf node_modules package-lock.json
+          npm install
 
       - name: Determine client name
         id: client
@@ -125,6 +120,7 @@ jobs:
           fi
 
       - name: Setup Android keystore from credentials.json
+        id: keystore_setup
         run: |
           # Leggi credentials.json se esiste (opzionale, come in app-refactor)
           if [ -f "credentials.json" ]; then
@@ -141,24 +137,20 @@ jobs:
               echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
               echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
               echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
+              echo "keystore_configured=true" >> $GITHUB_OUTPUT
               echo "✅ Keystore configurato da credentials.json"
             else
-              echo "⚠️  credentials.json presente ma dati keystore incompleti - usando GitHub Secrets"
-              mkdir -p fastlane/keystores
-              if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-                echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > fastlane/keystores/release.keystore
-                echo "KEYSTORE_PATH=./fastlane/keystores/release.keystore" >> $GITHUB_ENV
-                echo "KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
-                echo "KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
-                echo "KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
-                echo "✅ Keystore configurato da GitHub Secrets"
-              else
-                echo "❌ Nessuna configurazione keystore trovata!"
-                exit 1
-              fi
+              echo "⚠️  credentials.json presente ma dati keystore incompleti"
+              echo "keystore_configured=false" >> $GITHUB_OUTPUT
             fi
           else
-            echo "⚠️  credentials.json non trovato - usando GitHub Secrets"
+            echo "⚠️  credentials.json non trovato"
+            echo "keystore_configured=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Se credentials.json non ha funzionato, prova GitHub Secrets
+          if [ "${{ steps.keystore_setup.outputs.keystore_configured }}" != "true" ]; then
+            echo "📦 Tentativo con GitHub Secrets..."
             mkdir -p fastlane/keystores
             if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
               echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > fastlane/keystores/release.keystore
@@ -166,22 +158,51 @@ jobs:
               echo "KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
               echo "KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
               echo "KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
+              echo "keystore_configured=true" >> $GITHUB_OUTPUT
               echo "✅ Keystore configurato da GitHub Secrets"
             else
-              echo "❌ Nessuna configurazione keystore trovata!"
+              echo "⚠️  GitHub Secrets non configurati"
+              echo "keystore_configured=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+          
+          # Se ancora non configurato, verifica se è build_only
+          if [ "${{ steps.keystore_setup.outputs.keystore_configured }}" != "true" ]; then
+            BUILD_ONLY="${{ github.event.inputs.build_only || github.event.client_payload.build_only || 'false' }}"
+            if [ "$BUILD_ONLY" == "true" ]; then
+              echo "⚠️  Keystore non configurato ma build_only=true - continuo senza keystore (build non firmato)"
+              echo "KEYSTORE_PATH=" >> $GITHUB_ENV
+              echo "KEYSTORE_PASSWORD=" >> $GITHUB_ENV
+              echo "KEY_ALIAS=" >> $GITHUB_ENV
+              echo "KEY_PASSWORD=" >> $GITHUB_ENV
+            else
+              echo "❌ Nessuna configurazione keystore trovata e build_only=false!"
+              echo "❌ Per rilasciare su Play Store serve un keystore."
+              echo "❌ Configura:"
+              echo "   1. credentials.json nel repository privato, oppure"
+              echo "   2. Secret ANDROID_KEYSTORE_BASE64 nel repository pubblico"
               exit 1
             fi
           fi
 
       - name: Create .env.android
         run: |
-          cat > .env.android << EOF
+          # Crea .env.android solo se keystore è configurato
+          if [ -n "${KEYSTORE_PATH}" ]; then
+            cat > .env.android << EOF
           KEYSTORE_PATH=${KEYSTORE_PATH}
           KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}
           KEY_ALIAS=${KEY_ALIAS}
           KEY_PASSWORD=${KEY_PASSWORD}
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=./fastlane/google-play-service-account.json
           EOF
+            echo "✅ .env.android creato con keystore"
+          else
+            cat > .env.android << EOF
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=./fastlane/google-play-service-account.json
+          EOF
+            echo "⚠️  .env.android creato senza keystore (build non firmato)"
+          fi
 
       - name: Decode and Create Google Play Json Key
         run: |
