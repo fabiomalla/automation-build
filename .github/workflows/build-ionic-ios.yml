@@ -22,6 +22,11 @@ on:
         required: false
         default: true
         type: boolean
+      setup_nginx:
+        description: "Configura Nginx sulla VPS (crea config, URL, etc.) (default: false)"
+        required: false
+        default: false
+        type: boolean
   repository_dispatch:
     types: [build-ionic-ios]
 
@@ -176,6 +181,7 @@ jobs:
           CLIENT_NAME: ${{ steps.client.outputs.client_name }}
           BUILD_ONLY: ${{ github.event.inputs.build_only || github.event.client_payload.build_only || 'false' }}
           DEPLOY_VPS: ${{ github.event.inputs.deploy_vps || github.event.client_payload.deploy_vps || 'true' }}
+          SETUP_NGINX: ${{ github.event.inputs.setup_nginx || github.event.client_payload.setup_nginx || 'false' }}
           APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
           APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
@@ -199,6 +205,14 @@ jobs:
             echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
             echo "📦 Versione app: $APP_VERSION"
             echo "📱 Bundle ID: $BUNDLE_ID"
+            
+            # Setup Nginx se richiesto (prima del deploy)
+            if [ "$SETUP_NGINX" == "true" ]; then
+              echo "🔧 Configurazione Nginx per: $CLIENT"
+              node scripts/setup-nginx-client.js $CLIENT
+              echo "✅ Configurazione Nginx generata"
+              echo "📋 Istruzioni per configurare Nginx sulla VPS sono state generate in nginx-configs/"
+            fi
             
             # Estrai e trasforma nome app per bundle target (come in build.yml)
             NAME="$APP_NAME"
