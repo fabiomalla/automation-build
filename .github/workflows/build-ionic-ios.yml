@@ -96,12 +96,6 @@ jobs:
             echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
           fi
 
-      - name: Install CocoaPods dependencies
-        run: |
-          cd ios/App
-          pod install
-          cd ../..
-
       - name: Determine client name
         id: client
         run: |
@@ -246,6 +240,27 @@ jobs:
             
             echo "BUNDLE_TARGET=$BUNDLE_TARGET" >> $GITHUB_ENV
             echo "EXTENSION_BUNDLE_ID=$EXTENSION_BUNDLE_ID" >> $GITHUB_ENV
+            
+            # Sincronizza Capacitor iOS (crea/aggiorna struttura iOS, incluso Podfile)
+            # Questo deve essere fatto PRIMA di pod install
+            echo "🔄 Sincronizzazione Capacitor iOS..."
+            PRODUCTION_SERVER_URL=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients['$CLIENT']?.productionServerUrl || '')")
+            PRODUCTION_SERVER_URL="$PRODUCTION_SERVER_URL" npx cap sync ios
+            
+            # Fix OneSignal Package Swift (cap sync lo cancella/rigenera)
+            echo "🔧 Fix OneSignal Package Swift..."
+            node scripts/fix-onesignal-package.js
+            
+            # Installa CocoaPods dependencies (dopo cap sync che crea il Podfile)
+            echo "📦 Installazione CocoaPods dependencies..."
+            if [ -f "ios/App/Podfile" ]; then
+              cd ios/App
+              pod install
+              cd ../..
+              echo "✅ CocoaPods installato"
+            else
+              echo "⚠️  Podfile non trovato dopo cap sync - potrebbe essere un problema"
+            fi
             
             # Run Fastlane Create App (crea app e provisioning profiles)
             if [ "$APP_VERSION" == "1.0.0" ] && [ "$BUILD_ONLY" != "true" ]; then
