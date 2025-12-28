@@ -313,8 +313,14 @@ jobs:
             fi
             
             # Run Fastlane Create App (crea app e provisioning profiles)
-            if [ "$APP_VERSION" == "1.0.0" ] && [ "$BUILD_ONLY" != "true" ]; then
-              echo "🆕 Prima release (1.0.0) - creando app su App Store Connect"
+            # Esegui sempre create_app per assicurarsi che Push Notifications sia abilitato
+            # (create_app gestisce il caso in cui l'app esista già)
+            if [ "$BUILD_ONLY" != "true" ]; then
+              if [ "$APP_VERSION" == "1.0.0" ]; then
+                echo "🆕 Prima release (1.0.0) - creando app su App Store Connect"
+              else
+                echo "🔄 Verificando/abilitando Push Notifications sull'App ID esistente"
+              fi
               export AUTH_KEY_PATH="fastlane/AuthKey.p8"
               export APPLE_ID="${{ env.APPLE_ID }}"
               export APPLE_KEY_ID="${{ env.APPLE_KEY_ID }}"
@@ -323,7 +329,7 @@ jobs:
               export EXTENSION_BUNDLE_ID="$EXTENSION_BUNDLE_ID"
               export APP_NAME="$APP_NAME"
               fastlane create_app
-              echo "✅ App e provisioning profiles creati su App Store Connect"
+              echo "✅ App verificata/creata e Push Notifications abilitato su App Store Connect"
             fi
             
             # Crea credentials.json per iOS (come in build.yml)
