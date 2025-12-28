@@ -251,48 +251,51 @@ jobs:
             echo "🔧 Fix OneSignal Package Swift..."
             node scripts/fix-onesignal-package.js
             
-            # Verifica se il Podfile esiste (Capacitor 8 potrebbe non crearlo se usa solo SPM)
-            # Se non esiste, probabilmente Capacitor usa solo Swift Package Manager
-            # e non abbiamo bisogno di CocoaPods
+            # Crea Podfile minimo se non esiste (necessario per creare il workspace)
+            # Capacitor 8 usa SPM per le dipendenze native, ma il workspace viene creato da pod install
             if [ ! -f "ios/App/Podfile" ]; then
-              echo "⚠️  Podfile non trovato dopo cap sync"
-              echo "📋 Capacitor 8 potrebbe usare solo Swift Package Manager (SPM)"
-              echo "📋 Verificando se il workspace esiste già..."
+              echo "📝 Creazione Podfile minimo (necessario per creare workspace)..."
+              echo "# DO NOT MODIFY -- Auto-generated for workspace creation" > ios/App/Podfile
+              echo "# Capacitor 8 uses Swift Package Manager (SPM) for native dependencies" >> ios/App/Podfile
+              echo "# This Podfile is minimal and only needed to create the workspace" >> ios/App/Podfile
+              echo "platform :ios, '15.0'" >> ios/App/Podfile
+              echo "" >> ios/App/Podfile
+              echo "target 'App' do" >> ios/App/Podfile
+              echo "  # No pods needed - Capacitor 8 uses SPM" >> ios/App/Podfile
+              echo "end" >> ios/App/Podfile
+              echo "✅ Podfile minimo creato"
+            else
+              echo "✅ Podfile trovato"
+            fi
+            
+            # Installa CocoaPods dependencies per creare il workspace
+            # Anche con un Podfile vuoto, pod install crea il workspace necessario
+            if [ -f "ios/App/Podfile" ]; then
+              echo "📦 Installazione CocoaPods (crea workspace)..."
+              cd ios/App
               
-              # Se il workspace esiste già (creato da SPM), non serve pod install
-              if [ -d "ios/App/App.xcworkspace" ]; then
-                echo "✅ Workspace già esistente (probabilmente creato da SPM)"
-                echo "✅ Non serve pod install"
+              # Esegui pod install (anche con Podfile vuoto crea il workspace)
+              if pod install --repo-update; then
+                echo "✅ pod install completato"
               else
-                echo "❌ Workspace non trovato e Podfile mancante"
-                echo "📋 Potrebbe essere necessario un Podfile per OneSignal o altre dipendenze"
+                echo "⚠️  pod install ha avuto problemi, ma potrebbe aver creato il workspace"
+              fi
+              
+              cd ../..
+              
+              # Verifica che il workspace sia stato creato
+              if [ -d "ios/App/App.xcworkspace" ]; then
+                echo "✅ Workspace creato: ios/App/App.xcworkspace"
+              else
+                echo "❌ Workspace non creato dopo pod install!"
                 echo "📋 Lista file in ios/App/:"
                 ls -la ios/App/ | head -20
+                echo "📋 Contenuto Podfile:"
+                cat ios/App/Podfile
                 exit 1
               fi
             else
-              echo "✅ Podfile trovato, procedendo con pod install"
-            fi
-            
-            # Installa CocoaPods dependencies solo se il Podfile esiste
-            if [ -f "ios/App/Podfile" ]; then
-              echo "📦 Installazione CocoaPods dependencies..."
-              cd ios/App
-              pod install --repo-update
-              cd ../..
-              echo "✅ CocoaPods installato"
-            else
-              echo "ℹ️  Nessun Podfile trovato, saltando pod install (usando SPM)"
-            fi
-            
-            # Verifica che il workspace esista (creato da pod install o SPM)
-            if [ -d "ios/App/App.xcworkspace" ]; then
-              echo "✅ Workspace trovato: ios/App/App.xcworkspace"
-            else
-              echo "❌ Workspace non trovato!"
-              echo "📋 Verifica che cap sync sia stato eseguito correttamente"
-              echo "📋 Lista file in ios/App/:"
-              ls -la ios/App/ | head -20
+              echo "❌ Podfile non trovato dopo la creazione!"
               exit 1
             fi
             
