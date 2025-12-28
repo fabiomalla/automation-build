@@ -132,6 +132,19 @@ jobs:
           echo "${{ env.CERT_P12_BASE64 }}" | base64 --decode > certificate.p12
           security import certificate.p12 -P "${{ env.CERT_P12_PASSWORD }}" -A -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+          
+          # Decodifica provisioning profiles se disponibili (opzionale, possono essere scaricati da sigh)
+          if [ -n "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" ]; then
+            echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > provisioning_profile.mobileprovision
+            echo "✅ Provisioning profile decodificato"
+          else
+            echo "ℹ️  PROVISIONING_PROFILE_BASE64 non trovato, verranno scaricati da sigh se necessario"
+          fi
+          
+          if [ -n "${{ secrets.PROVISIONING_PROFILE_ONESIGNAL_BASE64 }}" ]; then
+            echo "${{ secrets.PROVISIONING_PROFILE_ONESIGNAL_BASE64 }}" | base64 --decode > provisioning_profile_onesignal.mobileprovision
+            echo "✅ Provisioning profile OneSignal decodificato"
+          fi
 
       - name: Configure Fastlane API Key
         run: |
