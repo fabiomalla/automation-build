@@ -255,11 +255,26 @@ jobs:
             echo "📦 Installazione CocoaPods dependencies..."
             if [ -f "ios/App/Podfile" ]; then
               cd ios/App
-              pod install
+              pod install --repo-update
               cd ../..
               echo "✅ CocoaPods installato"
+              
+              # Verifica che il workspace sia stato creato
+              if [ -d "ios/App/App.xcworkspace" ]; then
+                echo "✅ Workspace creato: ios/App/App.xcworkspace"
+              else
+                echo "❌ Workspace non creato dopo pod install!"
+                echo "📋 Verifica che pod install sia completato correttamente"
+                echo "📋 Lista file in ios/App/:"
+                ls -la ios/App/ | head -20
+                exit 1
+              fi
             else
-              echo "⚠️  Podfile non trovato dopo cap sync - potrebbe essere un problema"
+              echo "⚠️  Podfile non trovato dopo cap sync"
+              echo "📋 Verifica che cap sync sia stato eseguito correttamente"
+              echo "📋 Lista file in ios/App/:"
+              ls -la ios/App/ | head -20
+              exit 1
             fi
             
             # Run Fastlane Create App (crea app e provisioning profiles)
