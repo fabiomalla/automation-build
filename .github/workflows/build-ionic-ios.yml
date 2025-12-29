@@ -357,6 +357,11 @@ jobs:
             export EXPO_APPLE_KEY_ID="${{ env.APPLE_KEY_ID }}"
             export EXPO_APPLE_ISSUER_ID="${{ env.APPLE_ISSUER_ID }}"
             export EXPO_APPLE_API_KEY_PATH="fastlane/AuthKey.p8"
+            # Passa anche le variabili standard per compatibilità con Fastfile
+            export APPLE_TEAM_ID="${{ env.APPLE_TEAM_ID }}"
+            export APPLE_KEY_ID="${{ env.APPLE_KEY_ID }}"
+            export APPLE_ISSUER_ID="${{ env.APPLE_ISSUER_ID }}"
+            export AUTH_KEY_PATH="fastlane/AuthKey.p8"
             
             if [ "$BUILD_ONLY" == "true" ]; then
               fastlane ios build client:$CLIENT
