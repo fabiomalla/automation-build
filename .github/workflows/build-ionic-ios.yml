@@ -221,10 +221,8 @@ jobs:
             # Configura per il cliente (necessario per estrarre info)
             node scripts/build-client.js $CLIENT --production
             
-            # Estrai info dal progetto iOS dopo la configurazione
-            # Per iOS, la versione è in ios/App/App.xcodeproj/project.pbxproj o Info.plist
-            # Per semplicità, usiamo la versione da package.json o assumiamo 1.0.0 se non trovata
-            APP_VERSION=$(grep -E '"version"' package.json | head -1 | sed -E 's/.*"version":\s*"([^"]+)".*/\1/' || echo "1.0.0")
+            # Estrai info dal clients.config.json (versione specifica per cliente)
+            APP_VERSION=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients['$CLIENT']?.version || '1.0.0')")
             BUNDLE_ID=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients['$CLIENT']?.appId || '')")
             APP_NAME=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients['$CLIENT']?.appName || '')")
             
