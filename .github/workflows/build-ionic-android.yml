@@ -312,6 +312,40 @@ jobs:
               # Chiama il repository di automazione per creare l'app
               echo "🆕 Chiamando repository di automazione per creare app su Play Store"
               
+              # Determina il percorso dell'icona in base al cliente
+              # Per sibook-app-ionic: clients/<client>/logos/logo-lg.png
+              # Per sibook-app-refactor: assets/images/logo-lg.png (default)
+              ICON_PATH=""
+              if [ -f "clients/${CLIENT}/logos/logo-lg.png" ]; then
+                # sibook-app-ionic: usa il logo del cliente specifico
+                # Il percorso è relativo alla directory del repository di automazione (che sarà clonato dopo)
+                ICON_PATH="../clients/${CLIENT}/logos/logo-lg.png"
+                echo "📷 Usando logo cliente: $ICON_PATH"
+              elif [ -f "assets/images/logo-lg.png" ]; then
+                # sibook-app-refactor: usa il logo standard
+                ICON_PATH="../assets/images/logo-lg.png"
+                echo "📷 Usando logo standard: $ICON_PATH"
+              else
+                echo "⚠️  Logo non trovato, verrà usato il default del repository di automazione"
+              fi
+              
+              # Determina il percorso degli screenshots in base al progetto
+              # Per sibook-app-ionic: fastlane/metadata/android/it-IT/images/phoneScreenshots (se esiste) o fastlane/metadata/screenshots/it/
+              # Per sibook-app-refactor: fastlane/metadata/android/it-IT/images/phoneScreenshots (default)
+              SCREENSHOTS_PATH=""
+              if [ -d "fastlane/metadata/android/it-IT/images/phoneScreenshots" ]; then
+                # sibook-app-ionic o sibook-app-refactor: usa la directory Android standard
+                SCREENSHOTS_PATH="../fastlane/metadata/android/it-IT/images/phoneScreenshots"
+                echo "📸 Usando screenshots Android: $SCREENSHOTS_PATH"
+              elif [ -d "fastlane/metadata/screenshots/it" ]; then
+                # sibook-app-ionic: usa la directory screenshots/it/ (potrebbe contenere screenshot iOS, ma proviamo)
+                SCREENSHOTS_PATH="../fastlane/metadata/screenshots/it"
+                echo "📸 Usando screenshots da screenshots/it: $SCREENSHOTS_PATH"
+                echo "⚠️  Nota: questa directory potrebbe contenere screenshot iOS, verifica che siano compatibili"
+              else
+                echo "⚠️  Directory screenshots non trovata, verrà usato il default del repository di automazione"
+              fi
+              
               # Checkout Easybook Automation Repository usando git clone con token
               git clone https://${{ secrets.EASYBOOK_RELEASE_AUTOMATION_REPO_TOKEN }}@github.com/lorenzomalla/easybook-release-automation-android.git easybook-release-automation-android || true
               cd easybook-release-automation-android
@@ -324,6 +358,14 @@ jobs:
                 export APP_NAME="$APP_NAME"
                 export APP_BUNDLE_IDENTIFIER="$ANDROID_PACKAGE"
                 export APP_VERSION="$APP_VERSION"
+                if [ -n "$ICON_PATH" ]; then
+                  export ICON_DIR="$ICON_PATH"
+                  echo "📷 ICON_DIR impostato a: $ICON_PATH"
+                fi
+                if [ -n "$SCREENSHOTS_PATH" ]; then
+                  export SCREENSHOTS_DIR="$SCREENSHOTS_PATH"
+                  echo "📸 SCREENSHOTS_DIR impostato a: $SCREENSHOTS_PATH"
+                fi
                 npm run release:sibook
               else
                 export GOOGLE_PLAY_EMAIL="${{ env.GOOGLE_PLAY_EMAIL }}"
@@ -331,6 +373,14 @@ jobs:
                 export APP_NAME="$APP_NAME"
                 export APP_BUNDLE_IDENTIFIER="$ANDROID_PACKAGE"
                 export APP_VERSION="$APP_VERSION"
+                if [ -n "$ICON_PATH" ]; then
+                  export ICON_DIR="$ICON_PATH"
+                  echo "📷 ICON_DIR impostato a: $ICON_PATH"
+                fi
+                if [ -n "$SCREENSHOTS_PATH" ]; then
+                  export SCREENSHOTS_DIR="$SCREENSHOTS_PATH"
+                  echo "📸 SCREENSHOTS_DIR impostato a: $SCREENSHOTS_PATH"
+                fi
                 npm run start
               fi
               
