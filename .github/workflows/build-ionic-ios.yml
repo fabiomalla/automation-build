@@ -333,7 +333,51 @@ jobs:
             fi
             
             # Per versione 1.0.0: crea solo scheda App Store Connect (app, metadata, screenshot) senza build
-            # Per altre versioni: crea/verifica app e provisioning profiles
+            # Crea/verifica app e provisioning profiles (sempre, prima di qualsiasi build)
+            echo "📱 Creazione/verifica App ID e provisioning profiles..."
+            
+            # Configura Fastlane API Key
+            mkdir -p fastlane
+            if [ -n "$APPLE_P8" ]; then
+              echo "$APPLE_P8" | base64 --decode > fastlane/AuthKey.p8
+              jq -n \
+                --arg key_id "$APPLE_KEY_ID" \
+                --arg issuer_id "$APPLE_ISSUER_ID" \
+                --arg key "$(cat fastlane/AuthKey.p8)" \
+                --argjson in_house false \
+                '{key_id: $key_id, issuer_id: $issuer_id, key: $key, in_house: $in_house}' > fastlane/api_key.json
+              echo "✅ Fastlane API Key configurata"
+            fi
+            
+            # Imposta variabili d'ambiente per create_app
+            export AUTH_KEY_PATH="fastlane/AuthKey.p8"
+            export APPLE_ID="${{ env.APPLE_ID }}"
+            export APPLE_KEY_ID="${{ env.APPLE_KEY_ID }}"
+            export APPLE_ISSUER_ID="${{ env.APPLE_ISSUER_ID }}"
+            export BUNDLE_ID="$BUNDLE_ID"
+            export EXTENSION_BUNDLE_ID="$EXTENSION_BUNDLE_ID"
+            export APP_NAME="$APP_NAME"
+            
+            # Chiama create_app per creare App ID e scaricare provisioning profiles
+            echo "🔧 Eseguendo fastlane create_app..."
+            fastlane create_app || echo "⚠️  create_app fallito, continuo comunque (potrebbe essere già creato)"
+            
+            # Verifica che i provisioning profiles siano stati scaricati
+            if [ -f "provisioning_profile.mobileprovision" ]; then
+              echo "✅ Provisioning profile principale trovato"
+              ls -lh provisioning_profile.mobileprovision
+            else
+              echo "⚠️  Provisioning profile principale non trovato, verrà scaricato durante il build"
+            fi
+            
+            if [ -f "provisioning_profile_onesignal.mobileprovision" ]; then
+              echo "✅ Provisioning profile OneSignal trovato"
+              ls -lh provisioning_profile_onesignal.mobileprovision
+            else
+              echo "ℹ️  Provisioning profile OneSignal non trovato (opzionale)"
+            fi
+            
+            # Per versione 1.0.0: crea solo scheda App Store Connect (app, metadata, screenshot) senza build
             if [ "$BUILD_ONLY" != "true" ]; then
               if [ "$APP_VERSION" == "1.0.0" ]; then
                 echo "🆕 Prima release (1.0.0) - creando solo scheda App Store Connect (senza build)"
@@ -358,16 +402,7 @@ jobs:
                 echo "⏭️  Skipping build (da fare in locale)"
                 continue
               else
-                echo "🔄 Verificando/abilitando Push Notifications sull'App ID esistente"
-                export AUTH_KEY_PATH="fastlane/AuthKey.p8"
-                export APPLE_ID="${{ env.APPLE_ID }}"
-                export APPLE_KEY_ID="${{ env.APPLE_KEY_ID }}"
-                export APPLE_ISSUER_ID="${{ env.APPLE_ISSUER_ID }}"
-                export BUNDLE_ID="$BUNDLE_ID"
-                export EXTENSION_BUNDLE_ID="$EXTENSION_BUNDLE_ID"
-                export APP_NAME="$APP_NAME"
-                fastlane create_app
-                echo "✅ App verificata/creata e Push Notifications abilitato su App Store Connect"
+                echo "🔄 Build per versione $APP_VERSION (App ID e provisioning profiles già creati sopra)"
               fi
             fi
             
