@@ -309,7 +309,7 @@ jobs:
               echo "🆕 Prima release (1.0.0) - build completato, upload gestito da repository di automazione"
               fastlane android build client:$CLIENT
               
-              # Trova il percorso del file .aab
+              # Trova il percorso del file .aab (usa percorso assoluto per evitare problemi con cd)
               AAB_PATH="build/android/${CLIENT}/app-release.aab"
               if [ ! -f "$AAB_PATH" ]; then
                 echo "⚠️  File .aab non trovato in $AAB_PATH, cerco in altri percorsi..."
@@ -320,7 +320,11 @@ jobs:
                   exit 1
                 fi
               fi
+              
+              # Converti in percorso assoluto per evitare problemi quando cambiamo directory
+              AAB_PATH_ABS=$(cd "$(dirname "$AAB_PATH")" && pwd)/$(basename "$AAB_PATH")
               echo "📦 File .aab trovato: $AAB_PATH"
+              echo "📦 Percorso assoluto: $AAB_PATH_ABS"
               
               # Chiama il repository di automazione per creare l'app
               echo "🆕 Chiamando repository di automazione per creare app su Play Store"
@@ -379,9 +383,13 @@ jobs:
                   export SCREENSHOTS_DIR="$SCREENSHOTS_PATH"
                   echo "📸 SCREENSHOTS_DIR impostato a: $SCREENSHOTS_PATH"
                 fi
-                if [ -n "$AAB_PATH" ]; then
+                if [ -n "$AAB_PATH_ABS" ]; then
+                  export AAB_PATH="$AAB_PATH_ABS"
+                  echo "📦 AAB_PATH impostato a: $AAB_PATH (percorso assoluto)"
+                elif [ -n "$AAB_PATH" ]; then
+                  # Fallback: usa percorso relativo
                   export AAB_PATH="../$AAB_PATH"
-                  echo "📦 AAB_PATH impostato a: $AAB_PATH"
+                  echo "📦 AAB_PATH impostato a: $AAB_PATH (percorso relativo)"
                 fi
                 npm run release:sibook
               else
@@ -398,9 +406,13 @@ jobs:
                   export SCREENSHOTS_DIR="$SCREENSHOTS_PATH"
                   echo "📸 SCREENSHOTS_DIR impostato a: $SCREENSHOTS_PATH"
                 fi
-                if [ -n "$AAB_PATH" ]; then
+                if [ -n "$AAB_PATH_ABS" ]; then
+                  export AAB_PATH="$AAB_PATH_ABS"
+                  echo "📦 AAB_PATH impostato a: $AAB_PATH (percorso assoluto)"
+                elif [ -n "$AAB_PATH" ]; then
+                  # Fallback: usa percorso relativo
                   export AAB_PATH="../$AAB_PATH"
-                  echo "📦 AAB_PATH impostato a: $AAB_PATH"
+                  echo "📦 AAB_PATH impostato a: $AAB_PATH (percorso relativo)"
                 fi
                 npm run start
               fi
