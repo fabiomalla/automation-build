@@ -312,24 +312,31 @@ jobs:
               exit 1
             fi
             
-            # Run Fastlane Create App (crea app e provisioning profiles)
-            # Esegui sempre create_app per assicurarsi che Push Notifications sia abilitato
-            # (create_app gestisce il caso in cui l'app esista già)
+            # Per versione 1.0.0: crea solo scheda App Store Connect (app, metadata, screenshot) senza build
+            # Per altre versioni: crea/verifica app e provisioning profiles
             if [ "$BUILD_ONLY" != "true" ]; then
               if [ "$APP_VERSION" == "1.0.0" ]; then
-                echo "🆕 Prima release (1.0.0) - creando app su App Store Connect"
+                echo "🆕 Prima release (1.0.0) - creando solo scheda App Store Connect (senza build)"
+                export AUTH_KEY_PATH="fastlane/AuthKey.p8"
+                export APPLE_KEY_ID="${{ env.APPLE_KEY_ID }}"
+                export APPLE_ISSUER_ID="${{ env.APPLE_ISSUER_ID }}"
+                export APPLE_TEAM_ID="${{ env.APPLE_TEAM_ID }}"
+                fastlane ios setup_store client:$CLIENT
+                echo "✅ Scheda App Store Connect creata - ora puoi buildare in locale e caricare l'IPA manualmente"
+                echo "⏭️  Skipping build (da fare in locale)"
+                continue
               else
                 echo "🔄 Verificando/abilitando Push Notifications sull'App ID esistente"
+                export AUTH_KEY_PATH="fastlane/AuthKey.p8"
+                export APPLE_ID="${{ env.APPLE_ID }}"
+                export APPLE_KEY_ID="${{ env.APPLE_KEY_ID }}"
+                export APPLE_ISSUER_ID="${{ env.APPLE_ISSUER_ID }}"
+                export BUNDLE_ID="$BUNDLE_ID"
+                export EXTENSION_BUNDLE_ID="$EXTENSION_BUNDLE_ID"
+                export APP_NAME="$APP_NAME"
+                fastlane create_app
+                echo "✅ App verificata/creata e Push Notifications abilitato su App Store Connect"
               fi
-              export AUTH_KEY_PATH="fastlane/AuthKey.p8"
-              export APPLE_ID="${{ env.APPLE_ID }}"
-              export APPLE_KEY_ID="${{ env.APPLE_KEY_ID }}"
-              export APPLE_ISSUER_ID="${{ env.APPLE_ISSUER_ID }}"
-              export BUNDLE_ID="$BUNDLE_ID"
-              export EXTENSION_BUNDLE_ID="$EXTENSION_BUNDLE_ID"
-              export APP_NAME="$APP_NAME"
-              fastlane create_app
-              echo "✅ App verificata/creata e Push Notifications abilitato su App Store Connect"
             fi
             
             # Crea credentials.json per iOS (come in build.yml)
