@@ -63,39 +63,6 @@ jobs:
           rm -rf node_modules package-lock.json
           npm install
 
-      # Flag: se esiste sibook.txt => build per account SiBook
-      - name: Detect SiBook release flag
-        run: |
-          if [ -f "sibook.txt" ]; then
-            echo "SIBOOK_RELEASE=true" >> $GITHUB_ENV
-          else
-            echo "SIBOOK_RELEASE=false" >> $GITHUB_ENV
-          fi
-
-      - name: Set environment variables for iOS and handle APPLE_P8
-        run: |
-          echo "Setting environment variables for iOS"
-
-          if [ "$SIBOOK_RELEASE" = "true" ]; then
-            echo "🔵 Using SiBook Apple account"
-            echo "APPLE_ID=${{ secrets.APPLE_ID_SIBOOK }}" >> $GITHUB_ENV
-            echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID_SIBOOK }}" >> $GITHUB_ENV
-            echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID_SIBOOK }}" >> $GITHUB_ENV
-            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID_SIBOOK }}" >> $GITHUB_ENV
-            echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64_SIBOOK }}" >> $GITHUB_ENV
-            echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD_SIBOOK }}" >> $GITHUB_ENV
-            echo "APPLE_P8=${{ secrets.APPLE_P8_SIBOOK }}" >> $GITHUB_ENV
-          else
-            echo "🟢 Using Lorenzo Apple account"
-            echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
-            echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
-            echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
-            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
-            echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64 }}" >> $GITHUB_ENV
-            echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
-            echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
-          fi
-
       - name: Determine client name
         id: client
         run: |
@@ -118,6 +85,60 @@ jobs:
             echo "📦 Clienti trovati: $CLIENTS"
           else
             echo "clients=${{ steps.client.outputs.client_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Detect release account from clients.config.json
+        id: release_account
+        run: |
+          # Leggi releaseAccount dal clients.config.json
+          # Se ci sono più clienti, verifica che abbiano tutti lo stesso account
+          CLIENTS="${{ steps.clients.outputs.clients }}"
+          IFS=',' read -ra CLIENTS_ARRAY <<< "$CLIENTS"
+          
+          RELEASE_ACCOUNTS=()
+          for CLIENT in "${CLIENTS_ARRAY[@]}"; do
+            ACCOUNT=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients?.['$CLIENT']?.releaseAccount || 'lorenzo')")
+            RELEASE_ACCOUNTS+=("$ACCOUNT")
+            echo "📋 Client '$CLIENT' → releaseAccount: $ACCOUNT"
+          done
+          
+          # Verifica che tutti i clienti abbiano lo stesso account
+          UNIQUE_ACCOUNTS=($(printf '%s\n' "${RELEASE_ACCOUNTS[@]}" | sort -u))
+          if [ ${#UNIQUE_ACCOUNTS[@]} -gt 1 ]; then
+            echo "❌ Errore: I clienti hanno account di rilascio diversi!"
+            echo "   Account trovati: ${UNIQUE_ACCOUNTS[*]}"
+            echo "   Non è possibile buildare clienti con account diversi nella stessa esecuzione."
+            exit 1
+          fi
+          
+          # Usa l'account del primo cliente (tutti sono uguali)
+          RELEASE_ACCOUNT="${RELEASE_ACCOUNTS[0]}"
+          echo "release_account=$RELEASE_ACCOUNT" >> $GITHUB_OUTPUT
+          echo "✅ Account di rilascio determinato: $RELEASE_ACCOUNT"
+
+      - name: Set environment variables for iOS and handle APPLE_P8
+        run: |
+          echo "Setting environment variables for iOS"
+          RELEASE_ACCOUNT="${{ steps.release_account.outputs.release_account }}"
+
+          if [ "$RELEASE_ACCOUNT" = "sibook" ]; then
+            echo "🔵 Using SiBook Apple account"
+            echo "APPLE_ID=${{ secrets.APPLE_ID_SIBOOK }}" >> $GITHUB_ENV
+            echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID_SIBOOK }}" >> $GITHUB_ENV
+            echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID_SIBOOK }}" >> $GITHUB_ENV
+            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID_SIBOOK }}" >> $GITHUB_ENV
+            echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64_SIBOOK }}" >> $GITHUB_ENV
+            echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD_SIBOOK }}" >> $GITHUB_ENV
+            echo "APPLE_P8=${{ secrets.APPLE_P8_SIBOOK }}" >> $GITHUB_ENV
+          else
+            echo "🟢 Using Lorenzo Apple account (default)"
+            echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
+            echo "APPLE_ISSUER_ID=${{ secrets.APPLE_ISSUER_ID }}" >> $GITHUB_ENV
+            echo "APPLE_KEY_ID=${{ secrets.APPLE_KEY_ID }}" >> $GITHUB_ENV
+            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}" >> $GITHUB_ENV
+            echo "CERT_P12_BASE64=${{ secrets.CERT_P12_BASE64 }}" >> $GITHUB_ENV
+            echo "CERT_P12_PASSWORD=${{ secrets.CERT_P12_PASSWORD }}" >> $GITHUB_ENV
+            echo "APPLE_P8=${{ secrets.APPLE_P8 }}" >> $GITHUB_ENV
           fi
 
       - name: Create Keychain

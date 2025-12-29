@@ -89,19 +89,41 @@ jobs:
             echo "clients=${{ steps.client.outputs.client_name }}" >> $GITHUB_OUTPUT
           fi
 
-      # Flag: se esiste sibook.txt => build per account SiBook
-      - name: Detect SiBook release flag
+      - name: Detect release account from clients.config.json
+        id: release_account
         run: |
-          if [ -f "sibook.txt" ]; then
-            echo "SIBOOK_RELEASE=true" >> $GITHUB_ENV
-          else
-            echo "SIBOOK_RELEASE=false" >> $GITHUB_ENV
+          # Leggi releaseAccount dal clients.config.json
+          # Se ci sono più clienti, verifica che abbiano tutti lo stesso account
+          CLIENTS="${{ steps.clients.outputs.clients }}"
+          IFS=',' read -ra CLIENTS_ARRAY <<< "$CLIENTS"
+          
+          RELEASE_ACCOUNTS=()
+          for CLIENT in "${CLIENTS_ARRAY[@]}"; do
+            ACCOUNT=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients?.['$CLIENT']?.releaseAccount || 'lorenzo')")
+            RELEASE_ACCOUNTS+=("$ACCOUNT")
+            echo "📋 Client '$CLIENT' → releaseAccount: $ACCOUNT"
+          done
+          
+          # Verifica che tutti i clienti abbiano lo stesso account
+          UNIQUE_ACCOUNTS=($(printf '%s\n' "${RELEASE_ACCOUNTS[@]}" | sort -u))
+          if [ ${#UNIQUE_ACCOUNTS[@]} -gt 1 ]; then
+            echo "❌ Errore: I clienti hanno account di rilascio diversi!"
+            echo "   Account trovati: ${UNIQUE_ACCOUNTS[*]}"
+            echo "   Non è possibile buildare clienti con account diversi nella stessa esecuzione."
+            exit 1
           fi
+          
+          # Usa l'account del primo cliente (tutti sono uguali)
+          RELEASE_ACCOUNT="${RELEASE_ACCOUNTS[0]}"
+          echo "release_account=$RELEASE_ACCOUNT" >> $GITHUB_OUTPUT
+          echo "✅ Account di rilascio determinato: $RELEASE_ACCOUNT"
 
-      # Sceglie le credenziali Play Store in base a SIBOOK_RELEASE
+      # Sceglie le credenziali Play Store in base a releaseAccount
       - name: Set environment variables for Android
         run: |
-          if [ "$SIBOOK_RELEASE" = "true" ]; then
+          RELEASE_ACCOUNT="${{ steps.release_account.outputs.release_account }}"
+          
+          if [ "$RELEASE_ACCOUNT" = "sibook" ]; then
             # Controllo di sicurezza: se manca il secret fallisce subito
             if [ -z "${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64_SIBOOK }}" ]; then
               echo "❌ Missing GOOGLE_PLAY_JSON_KEY_BASE64_SIBOOK while SIBOOK_RELEASE=true"
@@ -113,12 +135,12 @@ jobs:
             echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD_SIBOOK }}" >> $GITHUB_ENV
             echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64_SIBOOK }}" >> $GITHUB_ENV
           else
+            echo "🟢 Using Lorenzo Google Play account (default)"
             if [ -z "${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" ]; then
               echo "❌ Missing GOOGLE_PLAY_JSON_KEY_BASE64"
               exit 1
             fi
 
-            echo "🟢 Using Lorenzo Google Play account"
             echo "GOOGLE_PLAY_EMAIL=${{ secrets.GOOGLE_PLAY_EMAIL }}" >> $GITHUB_ENV
             echo "GOOGLE_PLAY_PASSWORD=${{ secrets.GOOGLE_PLAY_PASSWORD }}" >> $GITHUB_ENV
             echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
