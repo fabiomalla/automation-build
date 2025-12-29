@@ -309,6 +309,19 @@ jobs:
               echo "🆕 Prima release (1.0.0) - build completato, upload gestito da repository di automazione"
               fastlane android build client:$CLIENT
               
+              # Trova il percorso del file .aab
+              AAB_PATH="build/android/${CLIENT}/app-release.aab"
+              if [ ! -f "$AAB_PATH" ]; then
+                echo "⚠️  File .aab non trovato in $AAB_PATH, cerco in altri percorsi..."
+                # Prova percorso alternativo
+                AAB_PATH=$(find build/android -name "app-release.aab" | head -1)
+                if [ -z "$AAB_PATH" ]; then
+                  echo "❌ File .aab non trovato!"
+                  exit 1
+                fi
+              fi
+              echo "📦 File .aab trovato: $AAB_PATH"
+              
               # Chiama il repository di automazione per creare l'app
               echo "🆕 Chiamando repository di automazione per creare app su Play Store"
               
@@ -366,6 +379,10 @@ jobs:
                   export SCREENSHOTS_DIR="$SCREENSHOTS_PATH"
                   echo "📸 SCREENSHOTS_DIR impostato a: $SCREENSHOTS_PATH"
                 fi
+                if [ -n "$AAB_PATH" ]; then
+                  export AAB_PATH="../$AAB_PATH"
+                  echo "📦 AAB_PATH impostato a: $AAB_PATH"
+                fi
                 npm run release:sibook
               else
                 export GOOGLE_PLAY_EMAIL="${{ env.GOOGLE_PLAY_EMAIL }}"
@@ -380,6 +397,10 @@ jobs:
                 if [ -n "$SCREENSHOTS_PATH" ]; then
                   export SCREENSHOTS_DIR="$SCREENSHOTS_PATH"
                   echo "📸 SCREENSHOTS_DIR impostato a: $SCREENSHOTS_PATH"
+                fi
+                if [ -n "$AAB_PATH" ]; then
+                  export AAB_PATH="../$AAB_PATH"
+                  echo "📦 AAB_PATH impostato a: $AAB_PATH"
                 fi
                 npm run start
               fi

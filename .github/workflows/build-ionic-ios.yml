@@ -213,6 +213,7 @@ jobs:
           APPLE_TEAM_ID: ${{ env.APPLE_TEAM_ID }}
           APPLE_KEY_ID: ${{ env.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ env.APPLE_ISSUER_ID }}
+          AUTH_KEY_PATH: fastlane/AuthKey.p8
         run: |
           IFS=',' read -ra CLIENTS_ARRAY <<< "${{ steps.clients.outputs.clients }}"
           for CLIENT in "${CLIENTS_ARRAY[@]}"; do
@@ -336,10 +337,22 @@ jobs:
             if [ "$BUILD_ONLY" != "true" ]; then
               if [ "$APP_VERSION" == "1.0.0" ]; then
                 echo "🆕 Prima release (1.0.0) - creando solo scheda App Store Connect (senza build)"
-                export AUTH_KEY_PATH="fastlane/AuthKey.p8"
-                export APPLE_KEY_ID="${{ env.APPLE_KEY_ID }}"
-                export APPLE_ISSUER_ID="${{ env.APPLE_ISSUER_ID }}"
-                export APPLE_TEAM_ID="${{ env.APPLE_TEAM_ID }}"
+                
+                # Verifica che il file API key esista
+                if [ ! -f "fastlane/AuthKey.p8" ]; then
+                  echo "❌ File fastlane/AuthKey.p8 non trovato!"
+                  exit 1
+                fi
+                echo "✅ File fastlane/AuthKey.p8 trovato"
+                
+                # Le variabili d'ambiente sono già disponibili tramite env: dello step
+                # Non serve fare export, sono già disponibili per fastlane
+                echo "🔍 Variabili d'ambiente disponibili:"
+                echo "   APPLE_KEY_ID=${APPLE_KEY_ID:0:10}... (primi 10 caratteri)"
+                echo "   APPLE_ISSUER_ID=${APPLE_ISSUER_ID:0:10}... (primi 10 caratteri)"
+                echo "   APPLE_TEAM_ID=${APPLE_TEAM_ID}"
+                echo "   AUTH_KEY_PATH=${AUTH_KEY_PATH}"
+                
                 fastlane ios setup_store client:$CLIENT
                 echo "✅ Scheda App Store Connect creata - ora puoi buildare in locale e caricare l'IPA manualmente"
                 echo "⏭️  Skipping build (da fare in locale)"
