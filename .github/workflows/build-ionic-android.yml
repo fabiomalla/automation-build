@@ -317,14 +317,42 @@ jobs:
                 AAB_PATH=$(find build/android -name "app-release.aab" | head -1)
                 if [ -z "$AAB_PATH" ]; then
                   echo "❌ File .aab non trovato!"
+                  echo "🔍 Directory corrente: $(pwd)"
+                  echo "🔍 Contenuto directory build:"
+                  ls -la build/ || echo "Directory build non esiste"
+                  echo "🔍 Contenuto directory build/android:"
+                  ls -la build/android/ || echo "Directory build/android non esiste"
                   exit 1
                 fi
               fi
               
               # Converti in percorso assoluto per evitare problemi quando cambiamo directory
-              AAB_PATH_ABS=$(cd "$(dirname "$AAB_PATH")" && pwd)/$(basename "$AAB_PATH")
+              # Usa readlink -f per ottenere il percorso assoluto canonico
+              if command -v readlink >/dev/null 2>&1; then
+                AAB_PATH_ABS=$(readlink -f "$AAB_PATH")
+              else
+                # Fallback per macOS (readlink -f non disponibile)
+                AAB_PATH_ABS=$(cd "$(dirname "$AAB_PATH")" && pwd)/$(basename "$AAB_PATH")
+              fi
+              
               echo "📦 File .aab trovato: $AAB_PATH"
               echo "📦 Percorso assoluto: $AAB_PATH_ABS"
+              echo "🔍 Directory corrente: $(pwd)"
+              
+              # Verifica che il file esista nel percorso assoluto
+              if [ ! -f "$AAB_PATH_ABS" ]; then
+                echo "❌ ERRORE: File .aab non trovato nel percorso assoluto: $AAB_PATH_ABS"
+                echo "🔍 Directory corrente: $(pwd)"
+                echo "🔍 Contenuto directory build/android:"
+                ls -la build/android/ || echo "Directory build/android non esiste"
+                if [ -d "build/android/${CLIENT}" ]; then
+                  echo "🔍 Contenuto directory build/android/${CLIENT}:"
+                  ls -la "build/android/${CLIENT}/"
+                fi
+                exit 1
+              fi
+              echo "✅ File .aab verificato nel percorso assoluto: $AAB_PATH_ABS"
+              echo "📊 Dimensione file: $(ls -lh "$AAB_PATH_ABS" | awk '{print $5}')"
               
               # Chiama il repository di automazione per creare l'app
               echo "🆕 Chiamando repository di automazione per creare app su Play Store"
@@ -386,6 +414,16 @@ jobs:
                 if [ -n "$AAB_PATH_ABS" ]; then
                   export AAB_PATH="$AAB_PATH_ABS"
                   echo "📦 AAB_PATH impostato a: $AAB_PATH (percorso assoluto)"
+                  echo "🔍 Verifica file prima di passarlo:"
+                  if [ -f "$AAB_PATH" ]; then
+                    echo "✅ File esiste: $AAB_PATH"
+                    ls -lh "$AAB_PATH"
+                  else
+                    echo "❌ File NON esiste: $AAB_PATH"
+                    echo "🔍 Directory corrente: $(pwd)"
+                    echo "🔍 Contenuto directory parent:"
+                    ls -la ../ || echo "Directory parent non accessibile"
+                  fi
                 elif [ -n "$AAB_PATH" ]; then
                   # Fallback: usa percorso relativo
                   export AAB_PATH="../$AAB_PATH"
@@ -409,6 +447,16 @@ jobs:
                 if [ -n "$AAB_PATH_ABS" ]; then
                   export AAB_PATH="$AAB_PATH_ABS"
                   echo "📦 AAB_PATH impostato a: $AAB_PATH (percorso assoluto)"
+                  echo "🔍 Verifica file prima di passarlo:"
+                  if [ -f "$AAB_PATH" ]; then
+                    echo "✅ File esiste: $AAB_PATH"
+                    ls -lh "$AAB_PATH"
+                  else
+                    echo "❌ File NON esiste: $AAB_PATH"
+                    echo "🔍 Directory corrente: $(pwd)"
+                    echo "🔍 Contenuto directory parent:"
+                    ls -la ../ || echo "Directory parent non accessibile"
+                  fi
                 elif [ -n "$AAB_PATH" ]; then
                   # Fallback: usa percorso relativo
                   export AAB_PATH="../$AAB_PATH"
