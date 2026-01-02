@@ -146,14 +146,16 @@ jobs:
             echo "GOOGLE_PLAY_JSON_KEY_BASE64=${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" >> $GITHUB_ENV
           fi
 
-      - name: Setup Android keystore from credentials.json
+      - name: Setup default Android keystore (fallback)
         id: keystore_setup
         run: |
+          # Setup keystore di default (fallback) da credentials.json o GitHub Secrets
+          # Il keystore specifico del cliente verrà gestito nel loop per ogni cliente
           KEYSTORE_CONFIGURED=false
           
-          # Leggi credentials.json se esiste (opzionale, come in app-refactor)
+          # Prova credentials.json
           if [ -f "credentials.json" ]; then
-            echo "📦 Usando credentials.json per keystore"
+            echo "📦 Tentativo con credentials.json per keystore (fallback)"
             KEYSTORE_PATH=$(node -e "const creds = require('./credentials.json'); console.log(creds.android?.keystore?.keystorePath || '')")
             KEYSTORE_PASSWORD=$(node -e "const creds = require('./credentials.json'); console.log(creds.android?.keystore?.keystorePassword || '')")
             KEY_ALIAS=$(node -e "const creds = require('./credentials.json'); console.log(creds.android?.keystore?.keyAlias || '')")
@@ -162,78 +164,32 @@ jobs:
             if [ -n "$KEYSTORE_PATH" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
               # Crea directory keystore se necessario
               mkdir -p $(dirname "$KEYSTORE_PATH")
-              echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> $GITHUB_ENV
-              echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
-              echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
-              echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
+              echo "DEFAULT_KEYSTORE_PATH=$KEYSTORE_PATH" >> $GITHUB_ENV
+              echo "DEFAULT_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
+              echo "DEFAULT_KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
+              echo "DEFAULT_KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
               KEYSTORE_CONFIGURED=true
-              echo "✅ Keystore configurato da credentials.json"
-            else
-              echo "⚠️  credentials.json presente ma dati keystore incompleti"
+              echo "✅ Keystore fallback configurato da credentials.json"
             fi
-          else
-            echo "⚠️  credentials.json non trovato"
           fi
           
-          # Se credentials.json non ha funzionato, prova GitHub Secrets
+          # Se ancora non configurato, prova GitHub Secrets
           if [ "$KEYSTORE_CONFIGURED" != "true" ]; then
-            echo "📦 Tentativo con GitHub Secrets..."
+            echo "📦 Tentativo con GitHub Secrets (fallback)..."
             mkdir -p fastlane/keystores
             if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
               echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > fastlane/keystores/release.keystore
-              # Usa path assoluto per evitare problemi con project_dir in Gradle
               KEYSTORE_ABS_PATH=$(pwd)/fastlane/keystores/release.keystore
-              echo "KEYSTORE_PATH=$KEYSTORE_ABS_PATH" >> $GITHUB_ENV
-              echo "KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
-              echo "KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
-              echo "KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
+              echo "DEFAULT_KEYSTORE_PATH=$KEYSTORE_ABS_PATH" >> $GITHUB_ENV
+              echo "DEFAULT_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+              echo "DEFAULT_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
+              echo "DEFAULT_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
               KEYSTORE_CONFIGURED=true
-              echo "✅ Keystore configurato da GitHub Secrets"
-              echo "📁 Path keystore: $KEYSTORE_ABS_PATH"
-            else
-              echo "⚠️  GitHub Secrets non configurati"
-            fi
-          fi
-          
-          # Se ancora non configurato, verifica se è build_only
-          if [ "$KEYSTORE_CONFIGURED" != "true" ]; then
-            BUILD_ONLY="${{ github.event.inputs.build_only || github.event.client_payload.build_only || 'false' }}"
-            if [ "$BUILD_ONLY" == "true" ]; then
-              echo "⚠️  Keystore non configurato ma build_only=true - continuo senza keystore (build non firmato)"
-              echo "KEYSTORE_PATH=" >> $GITHUB_ENV
-              echo "KEYSTORE_PASSWORD=" >> $GITHUB_ENV
-              echo "KEY_ALIAS=" >> $GITHUB_ENV
-              echo "KEY_PASSWORD=" >> $GITHUB_ENV
-            else
-              echo "❌ Nessuna configurazione keystore trovata e build_only=false!"
-              echo "❌ Per rilasciare su Play Store serve un keystore."
-              echo "❌ Configura:"
-              echo "   1. credentials.json nel repository privato, oppure"
-              echo "   2. Secret ANDROID_KEYSTORE_BASE64 nel repository pubblico"
-              exit 1
+              echo "✅ Keystore fallback configurato da GitHub Secrets"
             fi
           fi
           
           echo "keystore_configured=$KEYSTORE_CONFIGURED" >> $GITHUB_OUTPUT
-
-      - name: Create .env.android
-        run: |
-          # Crea .env.android solo se keystore è configurato
-          if [ -n "${KEYSTORE_PATH}" ]; then
-            cat > .env.android << EOF
-          KEYSTORE_PATH=${KEYSTORE_PATH}
-          KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}
-          KEY_ALIAS=${KEY_ALIAS}
-          KEY_PASSWORD=${KEY_PASSWORD}
-          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=./fastlane/google-play-service-account.json
-          EOF
-            echo "✅ .env.android creato con keystore"
-          else
-            cat > .env.android << EOF
-          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=./fastlane/google-play-service-account.json
-          EOF
-            echo "⚠️  .env.android creato senza keystore (build non firmato)"
-          fi
 
       - name: Decode and Create Google Play Json Key
         run: |
@@ -257,6 +213,81 @@ jobs:
           IFS=',' read -ra CLIENTS_ARRAY <<< "${{ steps.clients.outputs.clients }}"
           for CLIENT in "${CLIENTS_ARRAY[@]}"; do
             echo "🚀 Building Android per: $CLIENT"
+            
+            # Setup keystore specifico per questo cliente
+            KEYSTORE_CONFIGURED=false
+            echo "🔍 Controllo configurazione keystore per cliente: $CLIENT"
+            
+            # Controlla se il cliente ha un keystore specifico configurato in clients.config.json
+            CLIENT_KEYSTORE_PATH=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients?.['$CLIENT']?.android?.keystore?.path || '')")
+            CLIENT_KEYSTORE_ALIAS=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients?.['$CLIENT']?.android?.keystore?.alias || '')")
+            CLIENT_KEYSTORE_PASSWORD=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients?.['$CLIENT']?.android?.keystore?.password || '')")
+            CLIENT_KEYSTORE_KEY_PASSWORD=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients?.['$CLIENT']?.android?.keystore?.keyPassword || '')")
+            
+            if [ -n "$CLIENT_KEYSTORE_PATH" ] && [ -n "$CLIENT_KEYSTORE_PASSWORD" ] && [ -n "$CLIENT_KEYSTORE_ALIAS" ]; then
+              echo "📦 Keystore trovato nella configurazione del cliente"
+              echo "   Path: $CLIENT_KEYSTORE_PATH"
+              echo "   Alias: $CLIENT_KEYSTORE_ALIAS"
+              
+              # Se il path è relativo, risolvilo rispetto alla root del progetto
+              if [[ ! "$CLIENT_KEYSTORE_PATH" = /* ]]; then
+                CLIENT_KEYSTORE_PATH="$(pwd)/$CLIENT_KEYSTORE_PATH"
+              fi
+              
+              # Verifica che il file esista
+              if [ -f "$CLIENT_KEYSTORE_PATH" ]; then
+                export KEYSTORE_PATH="$CLIENT_KEYSTORE_PATH"
+                export KEYSTORE_PASSWORD="$CLIENT_KEYSTORE_PASSWORD"
+                export KEY_ALIAS="$CLIENT_KEYSTORE_ALIAS"
+                if [ -n "$CLIENT_KEYSTORE_KEY_PASSWORD" ]; then
+                  export KEY_PASSWORD="$CLIENT_KEYSTORE_KEY_PASSWORD"
+                else
+                  # Se keyPassword non è specificato, usa la stessa password del keystore
+                  export KEY_PASSWORD="$CLIENT_KEYSTORE_PASSWORD"
+                fi
+                KEYSTORE_CONFIGURED=true
+                echo "✅ Keystore configurato dalla configurazione del cliente: $CLIENT_KEYSTORE_PATH"
+              else
+                echo "⚠️  Keystore configurato ma file non trovato: $CLIENT_KEYSTORE_PATH"
+                echo "⚠️  Userò keystore fallback se disponibile"
+              fi
+            fi
+            
+            # Se non configurato dal cliente, usa il fallback
+            if [ "$KEYSTORE_CONFIGURED" != "true" ]; then
+              if [ -n "${DEFAULT_KEYSTORE_PATH}" ]; then
+                export KEYSTORE_PATH="${DEFAULT_KEYSTORE_PATH}"
+                export KEYSTORE_PASSWORD="${DEFAULT_KEYSTORE_PASSWORD}"
+                export KEY_ALIAS="${DEFAULT_KEY_ALIAS}"
+                export KEY_PASSWORD="${DEFAULT_KEY_PASSWORD}"
+                KEYSTORE_CONFIGURED=true
+                echo "✅ Usando keystore fallback: ${DEFAULT_KEYSTORE_PATH}"
+              fi
+            fi
+            
+            # Crea .env.android per questo cliente
+            if [ -n "${KEYSTORE_PATH}" ]; then
+              cat > .env.android << EOF
+          KEYSTORE_PATH=${KEYSTORE_PATH}
+          KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}
+          KEY_ALIAS=${KEY_ALIAS}
+          KEY_PASSWORD=${KEY_PASSWORD}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=./fastlane/google-play-service-account.json
+          EOF
+              echo "✅ .env.android creato con keystore per $CLIENT"
+            else
+              BUILD_ONLY_VALUE="${{ github.event.inputs.build_only || github.event.client_payload.build_only || 'false' }}"
+              if [ "$BUILD_ONLY_VALUE" == "true" ]; then
+                cat > .env.android << EOF
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON=./fastlane/google-play-service-account.json
+          EOF
+                echo "⚠️  .env.android creato senza keystore (build non firmato) per $CLIENT"
+              else
+                echo "❌ Nessuna configurazione keystore trovata per $CLIENT e build_only=false!"
+                echo "❌ Configura android.keystore in clients.config.json per questo cliente"
+                exit 1
+              fi
+            fi
             
             # Configura per il cliente (necessario per estrarre la versione)
             node scripts/build-client.js $CLIENT --production
