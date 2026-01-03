@@ -236,6 +236,16 @@ jobs:
           DEPLOY_VPS: ${{ github.event.inputs.deploy_vps || github.event.client_payload.deploy_vps || 'true' }}
           SETUP_NGINX: ${{ github.event.inputs.setup_nginx || github.event.client_payload.setup_nginx || 'false' }}
         run: |
+          # Debug: verifica branch e file clients.config.json
+          echo "🔍 Debug informazioni:"
+          echo "   Branch corrente: $(git branch --show-current 2>/dev/null || git rev-parse --abbrev-ref HEAD)"
+          echo "   Commit: $(git rev-parse HEAD)"
+          echo "   File clients.config.json esiste: $([ -f clients.config.json ] && echo 'SI' || echo 'NO')"
+          if [ -f clients.config.json ]; then
+            echo "   Clienti nel file: $(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(Object.keys(config.clients || {}).join(', '))" 2>/dev/null || echo 'ERRORE LETTURA')"
+          fi
+          echo ""
+          
           IFS=',' read -ra CLIENTS_ARRAY <<< "${{ steps.clients.outputs.clients }}"
           for CLIENT in "${CLIENTS_ARRAY[@]}"; do
             echo "🚀 Building Android per: $CLIENT"
