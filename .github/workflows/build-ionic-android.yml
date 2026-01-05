@@ -217,10 +217,6 @@ jobs:
           
           echo "keystore_configured=$KEYSTORE_CONFIGURED" >> $GITHUB_OUTPUT
 
-      - name: Decode and Create Google Play Json Key
-        run: |
-          echo "${{ env.GOOGLE_PLAY_JSON_KEY_BASE64 }}" | base64 --decode > google_play_json_key.json
-
       - name: Install Fastlane
         run: |
           sudo apt-get update
@@ -249,6 +245,26 @@ jobs:
           IFS=',' read -ra CLIENTS_ARRAY <<< "${{ steps.clients.outputs.clients }}"
           for CLIENT in "${CLIENTS_ARRAY[@]}"; do
             echo "🚀 Building Android per: $CLIENT"
+            
+            # Determina releaseAccount per questo cliente e crea il file JSON key corretto
+            CLIENT_RELEASE_ACCOUNT=$(node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('./clients.config.json', 'utf8')); console.log(config.clients?.['$CLIENT']?.releaseAccount || 'lorenzo')")
+            echo "🔑 Release account per $CLIENT: $CLIENT_RELEASE_ACCOUNT"
+            
+            # Crea il file google_play_json_key.json con le credenziali corrette per questo cliente
+            if [ "$CLIENT_RELEASE_ACCOUNT" = "sibook" ]; then
+              echo "🔵 Usando credenziali SiBook per $CLIENT"
+              echo "${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64_SIBOOK }}" | base64 --decode > google_play_json_key.json
+            else
+              echo "🟢 Usando credenziali Lorenzo (default) per $CLIENT"
+              echo "${{ secrets.GOOGLE_PLAY_JSON_KEY_BASE64 }}" | base64 --decode > google_play_json_key.json
+            fi
+            
+            # Verifica che il file sia stato creato correttamente
+            if [ ! -f "google_play_json_key.json" ]; then
+              echo "❌ Errore: google_play_json_key.json non creato per $CLIENT"
+              exit 1
+            fi
+            echo "✅ File google_play_json_key.json creato per $CLIENT con account $CLIENT_RELEASE_ACCOUNT"
             
             # Setup keystore specifico per questo cliente
             KEYSTORE_CONFIGURED=false
