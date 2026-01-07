@@ -344,12 +344,6 @@ jobs:
             # Configura per il cliente (necessario per estrarre la versione)
             node scripts/build-client.js $CLIENT --production
             
-            # Sync Capacitor Android
-            PRODUCTION_SERVER_URL=$(node -e "const c=require('./clients.config.json');console.log(c.clients?.['$CLIENT']?.productionServerUrl||'')") npx cap sync android
-            
-            # Fix Android resources (rimuove duplicati dopo cap sync)
-            node scripts/fix-android-resources.js $CLIENT
-            
             # Estrai versione da android/app/build.gradle dopo la configurazione
             APP_VERSION=$(grep -E "versionName\s+" android/app/build.gradle | sed -E 's/.*versionName\s+"([^"]+)".*/\1/' || echo "1.0.0")
             ANDROID_PACKAGE=$(grep -E "applicationId\s+" android/app/build.gradle | sed -E 's/.*applicationId\s+"([^"]+)".*/\1/' || echo "")
