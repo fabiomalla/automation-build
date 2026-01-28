@@ -225,49 +225,6 @@ jobs:
           echo 'export PATH=$HOME/.gem/bin:$PATH' >> $GITHUB_ENV
           gem install --user-install fastlane -NV
 
-      - name: Setup Gradle Wrapper
-        run: |
-          # Verifica se la directory android esiste
-          if [ ! -d "android" ]; then
-            echo "📱 Directory android non trovata, aggiungo la piattaforma Android..."
-            npx cap add android || echo "⚠️  npx cap add android fallito, continuo..."
-          fi
-          
-          # Verifica se gradlew esiste
-          if [ ! -f "android/gradlew" ]; then
-            echo "📱 Gradle Wrapper non trovato, genero il wrapper..."
-            
-            # Crea directory se non esiste
-            mkdir -p android/gradle/wrapper
-            
-            # Crea gradle-wrapper.properties
-            cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
-            distributionBase=GRADLE_USER_HOME
-            distributionPath=wrapper/dists
-            distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
-            networkTimeout=10000
-            validateDistributionUrl=true
-            zipStoreBase=GRADLE_USER_HOME
-            zipStorePath=wrapper/dists
-            EOF
-            
-            # Scarica gradle-wrapper.jar
-            echo "📥 Scarico gradle-wrapper.jar..."
-            curl -L https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
-            
-            # Scarica gradlew script
-            echo "📥 Scarico gradlew script..."
-            curl -L https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradlew -o android/gradlew
-            
-            # Rendi gradlew eseguibile
-            chmod +x android/gradlew
-            
-            echo "✅ Gradle Wrapper generato"
-          else
-            echo "✅ Gradle Wrapper già presente"
-            chmod +x android/gradlew
-          fi
-
       - name: Build for each client
         env:
           CLIENT_NAME: ${{ steps.client.outputs.client_name }}
