@@ -344,8 +344,8 @@ jobs:
             # Configura per il cliente (necessario per estrarre la versione)
             node scripts/build-client.js $CLIENT --production
             
-            # Verifica che settings.gradle e build.gradle esistano (generati da cap sync)
-            # Se mancano, il sync non è stato eseguito correttamente
+            # Verifica che settings.gradle e build.gradle esistano
+            # Capacitor 8 genera capacitor.settings.gradle, dobbiamo creare settings.gradle che lo include
             if [ ! -f "android/settings.gradle" ] || [ ! -f "android/build.gradle" ]; then
               echo "⚠️  File settings.gradle o build.gradle mancanti, eseguo cap sync android..."
               mkdir -p android/app/src/main/assets
@@ -356,14 +356,51 @@ jobs:
                 npx cap sync android
               fi
               
-              # Verifica che i file siano stati generati
+              # Capacitor 8 genera capacitor.settings.gradle, creiamo settings.gradle che lo include
+              if [ -f "android/capacitor.settings.gradle" ] && [ ! -f "android/settings.gradle" ]; then
+                echo "📝 Creo settings.gradle che include capacitor.settings.gradle..."
+                cat > android/settings.gradle << 'SETTINGS_EOF'
+include ':app'
+include ':capacitor-cordova-android-plugins'
+apply from: 'capacitor.settings.gradle'
+SETTINGS_EOF
+              fi
+              
+              # Crea build.gradle root se non esiste
+              if [ ! -f "android/build.gradle" ]; then
+                echo "📝 Creo build.gradle root..."
+                cat > android/build.gradle << 'BUILD_EOF'
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.5.0'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
+BUILD_EOF
+              fi
+              
+              # Verifica che i file siano stati creati
               if [ ! -f "android/settings.gradle" ] || [ ! -f "android/build.gradle" ]; then
-                echo "❌ ERRORE: settings.gradle o build.gradle non generati dopo cap sync!"
+                echo "❌ ERRORE: settings.gradle o build.gradle non creati!"
                 echo "📋 Contenuto directory android:"
                 ls -la android/ | head -10
                 exit 1
               fi
-              echo "✅ File Gradle generati correttamente"
+              echo "✅ File Gradle creati correttamente"
             fi
             
             # Estrai versione da android/app/build.gradle dopo la configurazione
