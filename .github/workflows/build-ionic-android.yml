@@ -365,7 +365,15 @@ jobs:
               # Crea build.gradle root se non esiste
               if [ ! -f "android/build.gradle" ]; then
                 echo "📝 Creo build.gradle root..."
-                printf 'buildscript {\n    repositories {\n        google()\n        mavenCentral()\n    }\n    dependencies {\n        classpath '\''com.android.tools.build:gradle:8.5.0'\''\n    }\n}\n\nallprojects {\n    repositories {\n        google()\n        mavenCentral()\n    }\n}\n\ntask clean(type: Delete) {\n    delete rootProject.buildDir\n}\n' > android/build.gradle
+                printf 'buildscript {\n    repositories {\n        google()\n        mavenCentral()\n    }\n    dependencies {\n        classpath '\''com.android.tools.build:gradle:8.7.0'\''\n    }\n}\n\nallprojects {\n    repositories {\n        google()\n        mavenCentral()\n    }\n}\n\ntask clean(type: Delete) {\n    delete rootProject.buildDir\n}\n' > android/build.gradle
+              fi
+              
+              # Aggiorna gradle-wrapper.properties per usare Gradle 8.7 (minimo richiesto)
+              if [ -f "android/gradle/wrapper/gradle-wrapper.properties" ]; then
+                echo "📝 Aggiorno gradle-wrapper.properties per usare Gradle 8.7..."
+                sed -i 's/gradle-8\.5/gradle-8.7/g' android/gradle/wrapper/gradle-wrapper.properties
+                sed -i 's/gradle-8\.5-all/gradle-8.7-all/g' android/gradle/wrapper/gradle-wrapper.properties
+                sed -i 's/gradle-8\.5-bin/gradle-8.7-all/g' android/gradle/wrapper/gradle-wrapper.properties
               fi
               
               # Verifica che i file siano stati creati
