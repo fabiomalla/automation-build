@@ -344,6 +344,28 @@ jobs:
             # Configura per il cliente (necessario per estrarre la versione)
             node scripts/build-client.js $CLIENT --production
             
+            # Verifica che settings.gradle e build.gradle esistano (generati da cap sync)
+            # Se mancano, il sync non è stato eseguito correttamente
+            if [ ! -f "android/settings.gradle" ] || [ ! -f "android/build.gradle" ]; then
+              echo "⚠️  File settings.gradle o build.gradle mancanti, eseguo cap sync android..."
+              mkdir -p android/app/src/main/assets
+              PRODUCTION_SERVER_URL=$(node -e "const c=require('./clients.config.json');console.log(c.clients?.['$CLIENT']?.productionServerUrl||'')")
+              if [ -n "$PRODUCTION_SERVER_URL" ]; then
+                PRODUCTION_SERVER_URL=$PRODUCTION_SERVER_URL npx cap sync android
+              else
+                npx cap sync android
+              fi
+              
+              # Verifica che i file siano stati generati
+              if [ ! -f "android/settings.gradle" ] || [ ! -f "android/build.gradle" ]; then
+                echo "❌ ERRORE: settings.gradle o build.gradle non generati dopo cap sync!"
+                echo "📋 Contenuto directory android:"
+                ls -la android/ | head -10
+                exit 1
+              fi
+              echo "✅ File Gradle generati correttamente"
+            fi
+            
             # Estrai versione da android/app/build.gradle dopo la configurazione
             APP_VERSION=$(grep -E "versionName\s+" android/app/build.gradle | sed -E 's/.*versionName\s+"([^"]+)".*/\1/' || echo "1.0.0")
             ANDROID_PACKAGE=$(grep -E "applicationId\s+" android/app/build.gradle | sed -E 's/.*applicationId\s+"([^"]+)".*/\1/' || echo "")
