@@ -441,20 +441,27 @@ jobs:
               echo "🆕 Chiamando repository di automazione per creare app su Play Store"
               
               # Determina il percorso dell'icona in base al cliente
-              # Per sibook-app-ionic: clients/<client>/logos/logo-lg.png
-              # Per sibook-app-refactor: assets/images/logo-lg.png (default)
+              # Per sibook-app-ionic: clients/<client>/logos/logo-lg.png oppure public/assets/images/logo-lg.png (dopo build-client)
+              # Per sibook-app-refactor: assets/images/logo-lg.png
+              # Usa percorso ASSOLUTO per evitare problemi di risoluzione quando si fa cd nel repo di automazione
               ICON_PATH=""
               if [ -f "clients/${CLIENT}/logos/logo-lg.png" ]; then
-                # sibook-app-ionic: usa il logo del cliente specifico
-                # Il percorso è relativo alla directory del repository di automazione (che sarà clonato dopo)
-                ICON_PATH="../clients/${CLIENT}/logos/logo-lg.png"
+                ICON_PATH_ABS="$(pwd)/clients/${CLIENT}/logos/logo-lg.png"
+                ICON_PATH="$ICON_PATH_ABS"
                 echo "📷 Usando logo cliente: $ICON_PATH"
+              elif [ -f "public/assets/images/logo-lg.png" ]; then
+                # sibook-app-ionic: logo copiato da build-client.js
+                ICON_PATH_ABS="$(pwd)/public/assets/images/logo-lg.png"
+                ICON_PATH="$ICON_PATH_ABS"
+                echo "📷 Usando logo da public/assets: $ICON_PATH"
               elif [ -f "assets/images/logo-lg.png" ]; then
                 # sibook-app-refactor: usa il logo standard
-                ICON_PATH="../assets/images/logo-lg.png"
+                ICON_PATH_ABS="$(pwd)/assets/images/logo-lg.png"
+                ICON_PATH="$ICON_PATH_ABS"
                 echo "📷 Usando logo standard: $ICON_PATH"
               else
-                echo "⚠️  Logo non trovato, verrà usato il default del repository di automazione"
+                echo "⚠️  Logo non trovato in clients/${CLIENT}/logos/, public/assets/images/ né assets/images/"
+                echo "⚠️  Verrà usato il default del repository di automazione (../assets/images/logo-lg.png)"
               fi
               
               # Determina il percorso degli screenshots in base al progetto
