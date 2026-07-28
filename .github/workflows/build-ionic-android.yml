@@ -37,6 +37,9 @@ env:
 jobs:
   build_android:
     runs-on: ubuntu-latest
+    env:
+      # Disponibile a tutti gli step (Fastlane compreso). Secret repo: JSON map clientId → base64.
+      FCM_ANDROID_GOOGLE_SERVICES_BY_CLIENT: ${{ secrets.FCM_ANDROID_GOOGLE_SERVICES_BY_CLIENT }}
 
     steps:
 
@@ -225,14 +228,30 @@ jobs:
           echo 'export PATH=$HOME/.gem/bin:$PATH' >> $GITHUB_ENV
           gem install --user-install fastlane -NV
 
+      - name: Materialize FCM Android google-services map
+        run: |
+          if [ -z "${FCM_ANDROID_GOOGLE_SERVICES_BY_CLIENT}" ]; then
+            echo "❌ Secret FCM_ANDROID_GOOGLE_SERVICES_BY_CLIENT mancante o vuoto su questo repo"
+            echo "   Aggiungilo in Settings → Secrets → Actions"
+            echo '   Valore esempio: {"sibook-admin-app":"<base64 di google-services.json>"}'
+            exit 1
+          fi
+          # Scrivi su file: Fastlane a volte non propaga tutti gli ENV ai subprocess Node
+          printf '%s' "$FCM_ANDROID_GOOGLE_SERVICES_BY_CLIENT" > .fcm-android-google-services-by-client.json
+          node -e "
+            const fs=require('fs');
+            const m=JSON.parse(fs.readFileSync('.fcm-android-google-services-by-client.json','utf8'));
+            const keys=Object.keys(m);
+            if(!keys.length) { console.error('❌ Map vuota'); process.exit(1); }
+            console.log('✅ FCM Android map OK, clienti:', keys.join(', '));
+          "
+
       - name: Build for each client
         env:
           CLIENT_NAME: ${{ steps.client.outputs.client_name }}
           BUILD_ONLY: ${{ github.event.inputs.build_only || github.event.client_payload.build_only || 'false' }}
           DEPLOY_VPS: ${{ github.event.inputs.deploy_vps || github.event.client_payload.deploy_vps || 'true' }}
           SETUP_NGINX: ${{ github.event.inputs.setup_nginx || github.event.client_payload.setup_nginx || 'false' }}
-          # Map clientId → base64(google-services.json) per push NATIVE (gitignored in repo)
-          FCM_ANDROID_GOOGLE_SERVICES_BY_CLIENT: ${{ secrets.FCM_ANDROID_GOOGLE_SERVICES_BY_CLIENT }}
         run: |
           # Debug: verifica branch e file clients.config.json
           echo "🔍 Debug informazioni:"
