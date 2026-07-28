@@ -231,6 +231,8 @@ jobs:
           BUILD_ONLY: ${{ github.event.inputs.build_only || github.event.client_payload.build_only || 'false' }}
           DEPLOY_VPS: ${{ github.event.inputs.deploy_vps || github.event.client_payload.deploy_vps || 'true' }}
           SETUP_NGINX: ${{ github.event.inputs.setup_nginx || github.event.client_payload.setup_nginx || 'false' }}
+          # Map clientId → base64(google-services.json) per push NATIVE (gitignored in repo)
+          FCM_ANDROID_GOOGLE_SERVICES_BY_CLIENT: ${{ secrets.FCM_ANDROID_GOOGLE_SERVICES_BY_CLIENT }}
         run: |
           # Debug: verifica branch e file clients.config.json
           echo "🔍 Debug informazioni:"
